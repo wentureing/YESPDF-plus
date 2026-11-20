@@ -146,7 +146,7 @@
 · settings xml → shared_prefs
 · cover images → app data root
 
-Old files are backed up as xxx.bak-<timestamp> before overwrite.
+Old files are backed up as xxx.bak-{timestamp} before overwrite.
 You can safely pick the backup root folder (containing db/, sp/, covers/).</string>
     <string name="app_data_auto_restore_go">Pick backup folder</string>
     <string name="app_data_auto_restore_running">Restoring…</string>
