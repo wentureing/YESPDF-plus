@@ -17,10 +17,13 @@
 | 流水线 | 文件 | 职责 | 明确不做 |
 |---|---|---|---|
 | 测试 | `.github/workflows/ci-test.yml` | 单元测试 `:app:testDebugUnitTest` | 不打 APK |
-| 构建 | `.github/workflows/ci-build.yml` | `assembleDebug` / `assembleRelease` 出 APK 与 mapping；构建成功后把**最新 release APK** 推到 `release` 分支（仓库根目录，含 `README.md` 说明） | **不跑测试**（`-x test...`） |
+| 构建 | `.github/workflows/ci-build.yml` | `assembleDebug` / `assembleRelease` 出 APK 与 mapping；构建成功后发布**最新 release APK** 到两个入口：GitHub Release 固定 tag `latest`（滚动重建）+ `release` 分支根目录（镜像） | **不跑测试**（`-x test...`） |
 
-- `release` 分支由 CI **独占**：每次用孤儿提交 + `force push` 覆盖，只保留最新一份产物。
-  这是既定行为，不需要额外确认；其他分支的 force push 仍必须先确认。
+- **发布口径：每次只保留最新一个版本**。
+  - Release 入口：先 `gh release delete latest --cleanup-tag` 再重建，Releases 页面永远只有一个可下载 APK，链接稳定。
+  - 分支入口：`release` 分支由 CI 独占，每次孤儿提交 + `force push` 覆盖。
+  - 上述两种覆盖属既定行为，无需额外确认；其他分支的 force push 仍必须先确认。
+  - 不再为 `v*` tag 单独创建 Release（会产生多版本堆积）。
 
 - 两者**缓存必须互通**：统一使用同一个 `actions/cache` key
   （`gradle-cache-<os>-<hashFiles(**/*.gradle, gradle-wrapper.properties, gradle.properties)>`，`restore-keys` 前缀相同），

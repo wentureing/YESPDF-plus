@@ -173,9 +173,30 @@ jobs:
           git push -q -f origin release
           echo "published ${APK_NAME} to release branch"
 
-      - name: Publish GitHub Release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: out/*.apk
-          generate_release_notes: true
+      # 面向用户的下载入口：固定 tag "latest" 的滚动 Release。
+      # 每次先删掉旧 Release（含其 tag 与 assets）再重建，因此 Releases 页面
+      # 永远只有最新一份 APK，下载链接稳定不变。
+      - name: Publish rolling "latest" GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APK_PATH="$(ls out/*release*.apk | head -1 || true)"
+          if [ -z "${APK_PATH}" ]; then
+            echo "no release apk produced, skip"
+            exit 0
+          fi
+          APK_NAME="YESPDF-plus-v2.3.${{ github.run_number }}-${GITHUB_SHA::7}.apk"
+          cp "${GITHUB_WORKSPACE}/${APK_PATH}" "/tmp/${APK_NAME}"
+          gh release delete latest --yes --cleanup-tag -R "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || true
+          gh release create latest "/tmp/${APK_NAME}" \
+            -R "${GITHUB_REPOSITORY}" \
+            --title "最新版本 v2.3.${{ github.run_number }}" \
+            --latest \
+            --notes "版本 v2.3.${{ github.run_number }}（提交 ${GITHUB_SHA::7}，分支 ${{ github.ref_name }}）
+
+          构建记录：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          本 Release 由 CI 滚动更新，始终只保留最新一份 APK；同一构建也镜像在 release 分支根目录。"
+          echo "published release latest with ${APK_NAME}"

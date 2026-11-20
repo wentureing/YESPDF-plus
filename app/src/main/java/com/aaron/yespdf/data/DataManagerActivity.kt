@@ -1,6 +1,8 @@
 package com.aaron.yespdf.data
 
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -21,7 +23,6 @@ import com.aaron.yespdf.common.DialogManager
 import com.aaron.yespdf.common.UiManager
 import com.aaron.yespdf.common.security.PasswordVault
 import com.aaron.yespdf.common.utils.DialogUtils
-import com.blankj.utilcode.util.ClipboardUtils
 import com.blankj.utilcode.util.SPStaticUtils
 import com.github.anzewei.parallaxbacklayout.ParallaxBack
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -197,7 +198,7 @@ class DataManagerActivity : CommonActivity() {
         val handlers = HashMap<Int, () -> Unit>()
         var index = 0
 
-        fun add(label: String, danger: Boolean, action: () -> Unit) {
+        fun add(label: String, danger: Boolean = false, action: () -> Unit) {
             actions.add(label to danger)
             handlers[index++] = action
         }
@@ -214,7 +215,7 @@ class DataManagerActivity : CommonActivity() {
         }
         add(getString(R.string.app_data_copy_path)) {
             dialog.dismiss()
-            ClipboardUtils.copyText(item.file.absolutePath)
+            copyPathToClipboard(item.file.absolutePath)
             UiManager.showShort(R.string.app_data_path_copied)
         }
         if (item.canExport) {
@@ -265,6 +266,21 @@ class DataManagerActivity : CommonActivity() {
         return tv
     }
 
+    /**
+     * 复制到系统剪贴板。
+     *
+     * 不用 blankj 的 ClipboardUtils：utilcodex 1.23.7 里并没有这个类
+     * （154 个 util 类中无剪贴板相关），直接用系统 API 更可靠且零依赖。
+     */
+    private fun copyPathToClipboard(path: String) {
+        try {
+            val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            manager.setPrimaryClip(ClipData.newPlainText("YESPDF path", path))
+        } catch (e: Throwable) {
+            UiManager.showShort(R.string.app_data_op_failed)
+        }
+    }
+
     private fun showInfo(item: DataItem) {
         var dialog: Dialog? = null
         dialog = DialogManager.createDoubleBtnDialog(this) { tvTitle, tvContent, btnLeft, btnRight ->
@@ -272,7 +288,7 @@ class DataManagerActivity : CommonActivity() {
             tvContent.text = buildNote(item)
             btnLeft.setText(R.string.app_data_copy_path)
             btnLeft.setOnClickListener {
-                ClipboardUtils.copyText(item.file.absolutePath)
+                copyPathToClipboard(item.file.absolutePath)
                 UiManager.showShort(R.string.app_data_path_copied)
                 dialog?.dismiss()
             }
