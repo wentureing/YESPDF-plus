@@ -135,7 +135,10 @@ object InternalDataScanner {
     }
 
     private fun canRename(file: File, isDir: Boolean): Boolean {
-        if (isDir) return false
+        // 目录也允许改名（含 files/databases/shared_prefs 这类标准目录）。
+        // 改名后应用会重建同名空目录，旧数据仍留在改名后的目录里、可在管理页看到并操作，
+        // 具体风险由 UI 的二次确认提示承担。
+        if (isDir) return true
         val name = file.name
         // 数据库与设置文件的文件名被代码硬编码，改名会直接打不开
         if (name.startsWith(AppConfig.DB_NAME)) return false

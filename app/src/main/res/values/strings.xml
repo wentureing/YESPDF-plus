@@ -122,6 +122,9 @@
     <string name="app_data_pasted">%1$d item(s) pasted</string>
     <string name="app_data_info">Details</string>
     <string name="app_data_rename">Rename</string>
+    <string name="app_data_rename_root">Rename standard folder (app will recreate it empty)</string>
+    <string name="app_data_rename_multi">Select exactly one item</string>
+    <string name="app_data_delete_root_desc">%1$d item(s) will be deleted, including app standard folders (e.g. databases / shared_prefs). The app recreates them empty afterwards and their data is lost permanently. Original PDFs are unaffected.</string>
     <string name="app_data_name_invalid">Name cannot be empty</string>
     <string name="app_data_name_exists">A file with that name already exists</string>
     <string name="app_data_op_failed">Operation failed</string>

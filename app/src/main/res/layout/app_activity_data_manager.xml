@@ -69,9 +69,19 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@null"
-            android:textSize="@dimen/base_text_large"
+            android:textSize="@dimen/base_text_normal"
             android:textColor="@color/base_black"
             android:text="@string/app_data_copy" />
+
+        <Button
+            android:id="@+id/app_btn_rename"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:textSize="@dimen/base_text_normal"
+            android:textColor="@color/base_black"
+            android:text="@string/app_data_rename" />
 
         <Button
             android:id="@+id/app_btn_export"
@@ -79,7 +89,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@null"
-            android:textSize="@dimen/base_text_large"
+            android:textSize="@dimen/base_text_normal"
             android:textColor="@color/base_black"
             android:text="@string/app_data_export" />
 
@@ -89,7 +99,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@null"
-            android:textSize="@dimen/base_text_large"
+            android:textSize="@dimen/base_text_normal"
             android:textColor="@color/app_color_accent"
             android:text="@string/app_delete" />
 
@@ -99,7 +109,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@null"
-            android:textSize="@dimen/base_text_large"
+            android:textSize="@dimen/base_text_normal"
             android:textColor="@color/base_black_hint"
             android:text="@string/app_cancel" />
 

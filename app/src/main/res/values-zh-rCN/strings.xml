@@ -120,6 +120,9 @@
     <string name="app_data_pasted">已粘贴 %1$d 项</string>
     <string name="app_data_info">查看信息</string>
     <string name="app_data_rename">重命名</string>
+    <string name="app_data_rename_root">重命名标准目录（应用会重建一个空目录）</string>
+    <string name="app_data_rename_multi">只能选择一个条目</string>
+    <string name="app_data_delete_root_desc">将删除 %1$d 项，其中包含应用标准目录（如 databases / shared_prefs）：删除后应用会重建空目录，其中的历史数据永久丢失。原始 PDF 不受影响。</string>
     <string name="app_data_name_invalid">名称不能为空</string>
     <string name="app_data_name_exists">同名文件已存在</string>
     <string name="app_data_op_failed">操作失败</string>

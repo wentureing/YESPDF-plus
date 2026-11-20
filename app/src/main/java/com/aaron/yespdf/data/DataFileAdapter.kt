@@ -110,28 +110,21 @@ internal class DataFileAdapter(
         }
 
         view.app_iv_next.visibility = if (item.isDir && !selectionMode) View.VISIBLE else View.GONE
-        view.app_cb.visibility = when {
-            item.isDir -> View.GONE
-            selectionMode -> View.VISIBLE
-            else -> View.GONE
-        }
+        // 选择模式下目录也可勾选（目录同样支持删除/复制/导出/重命名）
+        view.app_cb.visibility = if (selectionMode) View.VISIBLE else View.GONE
         view.app_cb.isChecked = selected.contains(item.file.absolutePath)
 
         view.setOnClickListener {
             if (selectionMode) {
-                if (item.isDir) return@setOnClickListener
                 toggle(item)
             } else {
                 callback.onClick(item)
             }
         }
+        // 长按文件或目录都可进入选择模式
         view.setOnLongClickListener {
-            if (item.isDir) {
-                false
-            } else {
-                enterSelection(item)
-                true
-            }
+            enterSelection(item)
+            true
         }
     }
 

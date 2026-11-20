@@ -75,6 +75,7 @@ class DataManagerActivity : CommonActivity() {
         app_rv_data.adapter = adapter
         app_tv_path.setOnClickListener { goUp() }
         app_btn_copy.setOnClickListener { copySelected() }
+        app_btn_rename.setOnClickListener { renameSelected() }
         app_btn_export.setOnClickListener { exportSelected() }
         app_btn_delete_selected.setOnClickListener { confirmDelete(adapter.selectedFiles()) }
         app_btn_cancel_selection.setOnClickListener { adapter.exitSelection() }
@@ -376,6 +377,8 @@ class DataManagerActivity : CommonActivity() {
         if (!inSelection && !AppClipboard.isEmpty) {
             app_btn_paste.text = getString(R.string.app_data_paste, AppClipboard.count)
         }
+        app_btn_rename.isEnabled = count == 1
+        app_btn_rename.alpha = if (count == 1) 1f else 0.4f
         toolbar?.title =
                 if (inSelection) getString(R.string.app_data_selected, count)
                 else getString(R.string.app_data_manage)
@@ -408,7 +411,7 @@ class DataManagerActivity : CommonActivity() {
         if (item.canRename) {
             add(getString(R.string.app_data_rename)) {
                 dialog.dismiss()
-                rename(item)
+                renameFile(item.file)
             }
         }
         add(getString(R.string.app_data_copy_path)) {
@@ -507,12 +510,32 @@ class DataManagerActivity : CommonActivity() {
         dialog?.show()
     }
 
-    private fun rename(item: DataItem) {
+    /** 选择模式下点「重命名」：仅支持单选（文件或目录都可以） */
+    private fun renameSelected() {
+        val files = adapter.selectedFiles()
+        if (files.size != 1) {
+            UiManager.showShort(R.string.app_data_rename_multi)
+            return
+        }
+        val target = files[0]
+        adapter.exitSelection()
+        renameFile(target)
+    }
+
+    /**
+     * 重命名文件或目录。
+     *
+     * 目录改名会改变其中文件的绝对路径，因此改完要把 PDF.COVER 的前缀一起替换；
+     * 标准目录（files/databases/shared_prefs/cache）改名后应用会重建空目录，
+     * 旧数据仍留在改名后的目录里、可在本页继续操作。
+     */
+    private fun renameFile(file: File) {
+        val isRootDir = file.isDirectory && roots.any { it.dir.absolutePath == file.absolutePath }
         var dialog: Dialog? = null
         dialog = DialogManager.createInputDialog(this) { tvTitle, etInput, btnLeft, btnRight ->
-            tvTitle.setText(R.string.app_data_rename)
-            etInput.setText(item.title)
-            etInput.setSelection(item.title.length)
+            tvTitle.setText(if (isRootDir) R.string.app_data_rename_root else R.string.app_data_rename)
+            etInput.setText(file.name)
+            etInput.setSelection(file.name.length)
             btnLeft.setText(R.string.app_cancel)
             btnLeft.setOnClickListener { dialog?.dismiss() }
             btnRight.setText(R.string.app_confirm)
@@ -522,14 +545,14 @@ class DataManagerActivity : CommonActivity() {
                     UiManager.showShort(R.string.app_data_name_invalid)
                     return@setOnClickListener
                 }
-                val target = File(item.file.parentFile, newName)
+                val target = File(file.parentFile, newName)
                 if (target.exists()) {
                     UiManager.showShort(R.string.app_data_name_exists)
                     return@setOnClickListener
                 }
-                val moved = item.file.renameTo(target)
+                val moved = file.renameTo(target)
                 if (moved) {
-                    syncCoverPath(item.file, target)
+                    syncCoverPath(file, target)
                     dialog?.dismiss()
                     refresh()
                 } else {
@@ -540,11 +563,23 @@ class DataManagerActivity : CommonActivity() {
         dialog?.show()
     }
 
-    /** 封面改名后同步数据库中的 cover 路径，避免列表回落到占位图 */
+    /**
+     * 改名后同步数据库里的封面路径。
+     *
+     * 用**前缀替换**而不是精确匹配，这样目录改名也能一次性修好其下所有封面路径，
+     * 避免书库列表回落到占位图。
+     */
     private fun syncCoverPath(oldFile: File, newFile: File) {
-        val pdf = DataManager.getPdfList().firstOrNull { it.cover == oldFile.absolutePath } ?: return
-        pdf.cover = newFile.absolutePath
-        DBHelper.updatePDF(pdf)
+        val oldPrefix = oldFile.absolutePath
+        val affected = DataManager.getPdfList().filter {
+            !it.cover.isNullOrEmpty() && it.cover.startsWith(oldPrefix)
+        }
+        if (affected.isEmpty()) return
+        for (pdf in affected) {
+            val cover = pdf.cover ?: continue
+            pdf.cover = cover.replaceFirst(oldPrefix, newFile.absolutePath)
+            DBHelper.updatePDF(pdf)
+        }
         DataManager.updatePDFs()
     }
 
@@ -597,7 +632,12 @@ class DataManagerActivity : CommonActivity() {
         if (files.isEmpty()) return
         var dialog: BottomSheetDialog? = null
         dialog = DialogManager.createDeleteDialog(this) { tvDescription, _, btnCancel, btnDelete ->
-            tvDescription.text = getString(R.string.app_data_delete_desc, files.size)
+            val hasRootDir = files.any { f ->
+                f.isDirectory && roots.any { it.dir.absolutePath == f.absolutePath }
+            }
+            tvDescription.text = getString(
+                    if (hasRootDir) R.string.app_data_delete_root_desc else R.string.app_data_delete_desc,
+                    files.size)
             btnCancel.setText(R.string.app_cancel)
             btnCancel.setOnClickListener { dialog?.dismiss() }
             btnDelete.setText(R.string.app_delete)
