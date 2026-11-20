@@ -37,6 +37,9 @@ abstract class IViewAllPresenter(view: IViewAllView) : IPresenter<IViewAllView>(
     abstract fun goBack()
     abstract fun listStorage()
     abstract fun listFile(path: String?)
+
+    /** 原地重载当前目录（筛选开关切换后调用，避免跳回根目录） */
+    abstract fun reload()
     abstract fun detach()
 
     companion object {

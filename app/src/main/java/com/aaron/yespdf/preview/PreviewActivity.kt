@@ -27,6 +27,7 @@ import com.aaron.yespdf.R
 import com.aaron.yespdf.common.*
 import com.aaron.yespdf.common.bean.PDF
 import com.aaron.yespdf.common.event.RecentPDFEvent
+import com.aaron.yespdf.common.security.PasswordVault
 import com.aaron.yespdf.common.utils.AboutUtils
 import com.aaron.yespdf.common.utils.NotchUtils
 import com.aaron.yespdf.common.utils.PdfUtils
@@ -153,7 +154,7 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
         }
     }
     private val inputDialog: Dialog by lazy(LazyThreadSafetyMode.NONE) {
-        DialogManager.createInputDialog(this) { tvTitle, etInput, btnLeft, btnRight ->
+        DialogManager.createPasswordDialog(this) { tvTitle, etInput, cbRemember, btnLeft, btnRight ->
             tvTitle.setText(R.string.app_need_verify_password)
             etInput.addTextChangedListener(object : TextWatcherImpl() {
                 override fun onTextChanged(charSequence: CharSequence, i: Int, i1: Int, i2: Int) {
@@ -164,6 +165,8 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
             btnLeft.setOnClickListener { finish() }
             btnRight.setText(R.string.app_confirm)
             btnRight.setOnClickListener {
+                pendingRemember = cbRemember.isChecked
+                passwordFromVault = false
                 initPdf(uri, pdf)
                 inputDialog.dismiss()
             }
@@ -194,6 +197,12 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
     private var canvas: Canvas? = null // AndroidPDFView 的画布
     private var paint: Paint = Paint() // 画书签的画笔
     private var pageWidth = 0F
+
+    /** 本次密码是否来自本地保存（用于识别"已保存的密码失效"） */
+    private var passwordFromVault = false
+
+    /** 用户勾选了「记住密码」，等文档真正加载成功后再落盘 */
+    private var pendingRemember = false
     //endregion
 
     //region Lifecycle
@@ -594,6 +603,18 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
                 DBHelper.insertRecent(it)
                 DataManager.updatePDFs()
                 EventBus.getDefault().post(RecentPDFEvent())
+
+                // 已保存过密码的文件：先静默尝试，成功则用户完全无感；
+                // 失败（换机/改密）时清掉密文，等 pdfium 报错后再弹输入框。
+                if (password == null) {
+                    val saved = PasswordVault.load(it.path)
+                    if (saved != null) {
+                        password = saved
+                        passwordFromVault = true
+                    } else if (PasswordVault.has(it.path)) {
+                        PasswordVault.clear(it.path)
+                    }
+                }
             }
         }
     }
@@ -1064,6 +1085,7 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
                     initContentAndBookmark()
                     initAboutPage()
                     initBgSize()
+                    savePasswordIfNeeded()
                     init = false
                 }
                 .onTap { event: MotionEvent ->
@@ -1143,13 +1165,31 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
 
     private fun showError(throwable: Throwable) {
         if (throwable is PdfPasswordException) {
-            if (!StringUtils.isEmpty(password)) {
+            if (passwordFromVault) {
+                // 本地保存的密码已失效（换机、清过 Keystore、或文件密码被改）：
+                // 直接丢弃密文并回到手动输入，不打扰用户"密码错误"
+                pdf?.path?.let { PasswordVault.clear(it) }
+                password = null
+                passwordFromVault = false
+            } else if (!StringUtils.isEmpty(password)) {
                 UiManager.showCenterShort(R.string.app_password_error)
             }
             showInputDialog()
         } else {
             showAlertDialog()
         }
+    }
+
+    /**
+     * 文档真正加载成功后才保存密码 —— 避免把错误密码写进本地。
+     */
+    private fun savePasswordIfNeeded() {
+        if (!pendingRemember) return
+        pendingRemember = false
+        val p = pdf ?: return
+        val pwd = password ?: return
+        val saved = PasswordVault.save(p.path, pwd)
+        UiManager.showShort(if (saved) R.string.app_password_saved else R.string.app_password_save_unsupported)
     }
 
     private fun judgeFlipPage(event: MotionEvent): Boolean {

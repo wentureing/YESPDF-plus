@@ -144,7 +144,8 @@ class ViewAllAdapter(
                 holder.itemView.app_iv_icon.setImageResource(R.drawable.app_ic_folder_yellow_24dp)
                 holder.itemView.app_iv_next.visibility = View.VISIBLE
                 holder.itemView.app_cb.visibility = View.GONE
-                val files = file.listFiles(FileFilterImpl())
+                // 目录条目数按当前筛选状态统计，避免与进入后看到的内容不一致
+                val files = file.listFiles(ScanRuleFilter(ScanRuleFilter.MODE_BROWSE))
                 if (files != null) desc = context?.getString(R.string.app_item, files.size)
             } else { // 大小 MB 留小数点后一位
                 var size = (file.length().toDouble() / 1024 / 1024).toString()

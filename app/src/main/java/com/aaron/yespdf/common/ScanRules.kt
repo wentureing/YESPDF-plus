@@ -21,6 +21,7 @@ import com.google.gson.reflect.TypeToken
 object ScanRules {
 
     private const val SP_ENABLED = "SP_SCAN_RULES_ENABLED"
+    private const val SP_BROWSER_ENABLED = "SP_SCAN_RULES_BROWSER_ENABLED"
     private const val SP_INCLUDE_DIRS = "SP_SCAN_INCLUDE_DIRS"
     private const val SP_EXCLUDE_DIRS = "SP_SCAN_EXCLUDE_DIRS"
     private const val SP_EXCLUDE_FILES = "SP_SCAN_EXCLUDE_FILES"
@@ -36,6 +37,17 @@ object ScanRules {
     var enabled: Boolean
         get() = SPStaticUtils.getBoolean(SP_ENABLED, false)
         set(value) = SPStaticUtils.put(SP_ENABLED, value)
+
+    /**
+     * 「浏览全部」页是否应用同一份排除规则（需求 6）。
+     *
+     * 与 [enabled] 独立：
+     * - 扫描时可以关掉规则，同时浏览页仍按排除集合过滤；
+     * - 反之亦然。两个开关都默认关闭（"通常用不上，勾选时用上"）。
+     */
+    var browserEnabled: Boolean
+        get() = SPStaticUtils.getBoolean(SP_BROWSER_ENABLED, false)
+        set(value) = SPStaticUtils.put(SP_BROWSER_ENABLED, value)
 
     /**
      * 默认扫描目录。为空表示"所有已挂载存储卷"（含外置 SD 卡）。
@@ -69,9 +81,13 @@ object ScanRules {
         return if (includes.isEmpty()) fallbackRoots else includes
     }
 
-    /** 目录是否被排除（命中则整棵子树都不进入） */
+    /**
+     * 目录是否被排除。
+     *
+     * 注意：这里**不再判断** [enabled] / [browserEnabled]，由调用方按场景（扫描 / 浏览）
+     * 决定规则是否生效，避免两套开关互相干扰。
+     */
     fun isDirExcluded(path: String): Boolean {
-        if (!enabled) return false
         val target = normalize(path)
         if (target.isEmpty()) return false
         for (dir in excludeDirs) {
@@ -82,9 +98,9 @@ object ScanRules {
         return false
     }
 
-    /** 文件名是否被排除（支持 `*` / `?` 通配，不区分大小写） */
+    /** 文件名是否被排除（支持 `*` / `?` 通配，不区分大小写）；是否生效由调用方决定 */
     fun isFileExcluded(name: String): Boolean {
-        if (!enabled || name.isBlank()) return false
+        if (name.isBlank()) return false
         for (pattern in excludeFiles) {
             if (pattern.isBlank()) continue
             if (wildcardToRegex(pattern).matches(name)) return true

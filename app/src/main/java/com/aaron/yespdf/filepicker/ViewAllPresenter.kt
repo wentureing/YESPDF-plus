@@ -70,4 +70,16 @@ class ViewAllPresenter(view: IViewAllView) : IViewAllPresenter(view) {
             view.onShowFileList(result)
         }
     }
+
+    /**
+     * 原地重载当前目录：切换「应用排除规则」开关后调用，避免列表跳回根目录。
+     */
+    override fun reload() {
+        val path = curPath
+        if (path == null || path.isEmpty() || path == ROOT_PATH) {
+            listStorage()
+        } else {
+            listFile(path)
+        }
+    }
 }

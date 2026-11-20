@@ -52,6 +52,24 @@ object DialogManager {
         return dialog
     }
 
+    /**
+     * 密码输入对话框：在通用输入框基础上多一个「记住密码」勾选。
+     */
+    fun createPasswordDialog(context: Context,
+                             callback: (TextView, EditText, CheckBox, Button, Button) -> Unit): Dialog {
+        val view = LayoutInflater.from(context.applicationContext).inflate(R.layout.app_dialog_password, null)
+        val tvTitle = view.findViewById<TextView>(R.id.app_tv_title)
+        val etInput = view.findViewById<EditText>(R.id.app_et_input)
+        val cbRemember = view.findViewById<CheckBox>(R.id.app_cb_remember)
+        val btnCancel = view.findViewById<Button>(R.id.app_btn_cancel)
+        val btnConfirm = view.findViewById<Button>(R.id.app_btn_confirm)
+        callback(tvTitle, etInput, cbRemember, btnCancel, btnConfirm)
+        val dialog = DialogUtils.createDialog(context, view)
+        dialog.setCancelable(false)
+        dialog.setCanceledOnTouchOutside(false)
+        return dialog
+    }
+
     fun createDoubleBtnDialog(context: Context, callback: (TextView, TextView, Button, Button) -> Unit): Dialog {
         val inflater = LayoutInflater.from(context.applicationContext)
         val dialogView = inflater.inflate(R.layout.app_dialog_double_btn, null)

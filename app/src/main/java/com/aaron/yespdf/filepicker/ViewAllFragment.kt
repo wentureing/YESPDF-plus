@@ -19,6 +19,7 @@ import com.aaron.yespdf.R
 import com.aaron.yespdf.common.CommonFragment
 import com.aaron.yespdf.common.DialogManager
 import com.aaron.yespdf.common.GroupingAdapter
+import com.aaron.yespdf.common.ScanRules
 import com.aaron.yespdf.common.UiManager
 import com.blankj.utilcode.util.KeyboardUtils
 import com.blankj.utilcode.util.LogUtils
@@ -120,6 +121,7 @@ class ViewAllFragment : CommonFragment(), IViewAllView, ViewAllAdapter.Callback 
         (activity as SelectActivity).setRevealParam()
         app_horizontal_sv.isFocusableInTouchMode = true
         app_horizontal_sv.requestFocus()
+        syncFilterButton()
         app_horizontal_sv.setOnKeyListener(View.OnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
                 if (!presenter.canFinish()) {
@@ -208,6 +210,32 @@ class ViewAllFragment : CommonFragment(), IViewAllView, ViewAllAdapter.Callback 
         adapter = ViewAllAdapter(fileList, (activity as SelectActivity).importeds, this)
         adapter?.registerAdapterDataObserver(dataObserver)
         app_rv_select.adapter = adapter
+        initFilterButton()
+    }
+
+    /**
+     * 需求 6：路径栏右侧的筛选按钮 —— 应用「排除的路径与文件」集合。
+     * 与自动扫描共用同一份规则，但开关独立（ScanRules.browserEnabled）。
+     */
+    private fun initFilterButton() {
+        syncFilterButton()
+        app_ibtn_filter.setOnClickListener {
+            ScanRules.browserEnabled = !ScanRules.browserEnabled
+            syncFilterButton()
+            presenter.reload()
+            UiManager.showShort(if (ScanRules.browserEnabled)
+                R.string.app_view_all_apply_exclude_on
+            else
+                R.string.app_view_all_apply_exclude_off)
+        }
+    }
+
+    private fun syncFilterButton() {
+        app_ibtn_filter.isSelected = ScanRules.browserEnabled
+        app_ibtn_filter.setImageResource(if (ScanRules.browserEnabled)
+            R.drawable.app_ic_action_selectall_checked
+        else
+            R.drawable.app_ic_action_selectall_unchecked)
     }
 
     private fun setResultBack(type: Int, groupName: String?) {

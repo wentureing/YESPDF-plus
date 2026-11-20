@@ -48,6 +48,8 @@ class ViewAllModel : IViewAllModel {
     }
 
     init {
-        mListable = ByNameListable()
+        // 需求 6：「浏览全部」复用与自动扫描同一份排除集合，
+        // 由 ScanRules.browserEnabled 单独控制是否生效。
+        mListable = ByNameListable(ScanRuleFilter(ScanRuleFilter.MODE_BROWSE))
     }
 }
