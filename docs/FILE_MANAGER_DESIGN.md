@@ -178,22 +178,92 @@ private fun deleteDatabaseAndExit() {
 
 ### 9.2 目录"复制进出"（零新增依赖）
 
-用户要求允许目录复制进出。**不引入 `androidx.documentfile`**（当前依赖树里没有），采用固定中转目录方案，全流程只用现有权限（`READ/WRITE_EXTERNAL_STORAGE` 已在 manifest，且 `targetSdk 28` 走旧存储模型可直接写外部存储）：
+**不引入 `androidx.documentfile`**。`DocumentsContract` 的 tree 遍历 API 是 framework 自带的，手写约 40 行即可：
 
-| 方向 | 方案 | 交互 |
+```kotlin
+// 递归枚举用户选中的目录（零依赖，替代 DocumentFile）
+val treeUri = data.data!!
+contentResolver.takePersistableUriPermission(treeUri,
+    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
+contentResolver.query(
+    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocId),
+    arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+    null, null, null)
+// 读：contentResolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(treeUri, docId))
+// 写：contentResolver.openOutputStream(...)   ← 导出方向需要它
+```
+
+两个方向：
+
+| 方向 | 首选方式 | 兜底方式 |
 |---|---|---|
-| **导出（复制出去）** | 递归复制到 `Download/YESPDF_data/<yyyyMMdd_HHmmss>/`，写一份 `manifest.txt`（原路径、大小、注释、导出时间） | 长按目录 →「导出此目录」；或概览行「一键导出全部」 |
-| **导入（复制进来）** | 读取 `Download/YESPDF_restore/`（或用户通过系统文件管理器放到该处的目录），逐项复制回内部对应位置 | 长按目标目录 →「从备份导入」→ 列出 `YESPDF_restore/` 下的候选目录供选择 |
-| **单个文件导入** | `ACTION_OPEN_DOCUMENT` + `ContentResolver.openInputStream()`（零依赖），用于替换封面/覆盖 SP | 条目 →「替换内容」 |
+| **复制出** | 多选 →「导出」→ `ACTION_OPEN_DOCUMENT_TREE` 让用户挑目标文件夹 → 逐个 `openOutputStream` 写入，保留原文件名 | 不选目标时直接写 `Download/YESPDF_data/<时间戳>/` + `manifest.txt` |
+| **复制进** | 「从文件夹导入」→ `ACTION_OPEN_DOCUMENT_TREE`；或「选择文件导入」→ `ACTION_OPEN_DOCUMENT`（可多选，侧栏更全，见 §10） | 读取 `Download/YESPDF_restore/` |
 
 导入的安全约束：
 
 - **数据库文件导入后同样强制退出**（与 §9.1 同一条路径），提示"导入将在下次启动生效"，避免连接错乱；
 - SP 导入后提示"设置将在重启后生效"；
-- 覆盖前统一 `createDoubleBtnDialog` 确认，并自动把被覆盖文件先备份到 `Download/YESPDF_data/_before_import_<时间>/`（这样"进出"互为保险）。
+- 覆盖前统一 `createDoubleBtnDialog` 确认；导出时把被覆盖文件写进目标目录的 `_before_replace_<时间>/`（进出互为保险）。
 - 所有复制都在 `Dispatchers.IO` 上带进度回调，超过 50MB 或文件数 > 500 时先估算并提示预计耗时。
 
 ### 9.3 已确认的 UI 细节
 
 - 入口文案「**管理**」，图标复用 `app_ic_folder_yellow_24dp`，位置在 `app_pw_main.xml` 的「设置」与「关于」之间（即「关于」上方）。
 - 条目操作菜单包含「**复制路径**」（`ClipboardUtils.copyText`，blankj 已提供，零新增依赖）。
+
+---
+
+## 10. 调用系统「文件」App 的调研结论（用户观察到两种侧边栏）
+
+| 用户看到的结果 | 实际对应的 Intent | 侧边栏内容 | 能否选文件夹 |
+|---|---|---|---|
+| ① 图片 / 视频 / 音频 / 下载 / 手机型号 / 某些 App 开放的目录 | `ACTION_OPEN_DOCUMENT`（**未设 `EXTRA_MIME_TYPES`**，`type="*/*"`；或 `ACTION_GET_CONTENT`） | **完整**：`MediaDocumentsProvider` 的媒体分类根 + `DownloadStorageProvider` + `ExternalStorageProvider`（手机型号）+ 第三方 `DocumentsProvider` | ❌ 只能选文件 |
+| ② 只有 下载 / 手机型号 | `ACTION_OPEN_DOCUMENT_TREE`（目录选择器） | **只有可创建子目录的 roots**：Downloads、各存储卷、以及声明了 `FLAG_DIR_SUPPORTS_CREATE` 的第三方目录。媒体分类根不提供 createDocument，故不出现 | ✅ 可选文件夹 |
+
+**两个决定性事实**：
+
+1. **侧边栏被裁剪的第一元凶是 `EXTRA_MIME_TYPES`**：一旦按类型过滤，DocumentsUI 会自动把侧栏收缩成"可能含该类型的入口"，"最近/下载/SD 卡"都会消失。
+   → 所以**永远不要设 `EXTRA_MIME_TYPES`**；要限制类型就在拿到 `content://` 之后自己校验 MIME（我们本来就要校验：只接受 `.jpg`/`.xml`/`.db`）。
+2. **"选文件夹"与"完整侧栏（含图片/视频/音频）"在系统 Picker 里不可兼得**：这是 DocumentsUI 的 root 过滤规则决定的，不是我们调用方式错了。
+
+**零依赖的最终方案：双入口**
+
+| 入口 | Intent 配置 | 命中用户诉求 |
+|---|---|---|
+| 「选择文件导入」 | `ACTION_OPEN_DOCUMENT` + `type="*/*"` + `EXTRA_ALLOW_MULTIPLE=true` + `CATEGORY_OPENABLE`，**不设** `EXTRA_MIME_TYPES` | **结果 ①**（完整侧栏），可多选文件 |
+| 「从文件夹导入」 | `ACTION_OPEN_DOCUMENT_TREE` + `FLAG_GRANT_READ/WRITE/PERSISTABLE_URI_PERMISSION` | **结果 ②**（可选文件夹） |
+
+补充两个坑（写进 UI 提示）：
+
+- **Android 11+ 对 `OPEN_DOCUMENT_TREE` 有硬限制**：不能直接选 `Download` 根、内部存储根、`Android/data`、`Android/obb`，否则系统提示"无法使用此文件夹"。
+  → 页面提示引导用户选 **`Download/YESPDF_restore`** 这类子目录；这也是保留固定中转目录兜底的原因。
+- 不同厂商"文件"App（DocumentsUI 定制版）表现可能不同；若某项不可用，退回到兜底的中转目录路径，功能不会断。
+
+## 11. 多选 / 复制 / 粘贴（复用"导入"页的现有多选 UI）
+
+用户要求复制出时支持多选，因此文件管理页引入"选择模式"，**完全复用 `SelectActivity` / `ScanActivity` 已有的多选控件**：
+
+| 复用项 | 现有位置 | 在文件管理页的用途 |
+|---|---|---|
+| `app_sel_select_single` 复选框样式 | `ViewAllAdapter` 给 `app_cb` 动态装配的状态选择器 | 列表条目的多选勾选框（相同外观） |
+| `app_ibtn_check`（全选图标 + 三态 `app_ic_action_selectall_*`） | `SelectActivity.ibtnSelectAll` | 顶部全选/取消全选 |
+| `app_include_operation_bar.xml`（底部操作栏 + 计数按钮 + `app_sel_operate_*`） | `MainActivity` 批量删除 | 底部条：「复制 N」「导出 N」「删除 N」 |
+| 长按进入选择态、`invalidateOptionsMenu` 切换菜单 | `AllFragment2` / `CollectionFragment2` | 同一套交互习惯 |
+
+粘贴模型（应用内剪贴板，比系统剪贴板更可控）：
+
+```
+长按/勾选 → 底部「复制」 → 记录 List<源绝对路径> + 操作类型(COPY/MOVE) 到 AppClipboard（内存单例）
+   ↓ 进入目标目录
+目标目录底部条出现「粘贴 N」→ 逐项复制（同名时按 `name (1).jpg` 规则去重，弹窗可改）
+```
+
+- 「复制」与「剪切」两种语义都提供（`MOVE` 走 copy+delete，删除前二次确认）；
+- 跨"内部目录 ↔ 系统文件夹"的搬运走 §10 的两个系统入口，不经过 AppClipboard；
+- 选择态期间禁用列表刷新（AOSP DocumentsUI 的 `ContentLock` 思路），避免选中项失效。
