@@ -83,10 +83,12 @@ DataManagerActivity（标题：应用数据管理；toolbar 同 SettingsActivity
 |---|---|---|---|---|
 | 查看信息（路径/大小/时间/注释） | ✅ | ✅ | ✅ | ✅ |
 | 重命名 | ✅（同步更新 `PDF.cover` 字段） | ❌ 禁用（改名即打不开） | ❌ 禁用 | ✅ |
-| 删除 | ✅（`PDF.cover` 置空，列表回落到占位图） | ⚠️ 高危：二次确认 + 建议先导出 | ✅（= 恢复默认设置，需重启生效） | ✅ |
+| 删除 | ✅（`PDF.cover` 置空，列表回落到占位图） | ⚠️ **专用高危流程**（见 §9.1） | ✅（= 恢复默认设置，需重启生效） | ✅ |
 | 替换/导入内容 | ✅（从外部选图覆盖，自动压到 ≤512px/≤2MB） | ❌ | ❌ | ✅ 文本可覆盖 |
 | 查看内容 | ✅ 预览缩略图 | ✅ 只读表/行数 + 按书名搜索，导出 JSON/CSV | ✅ 只读文本视图 | ✅ 文本/十六进制前 4KB |
 | 导出副本 | ✅ | ✅ | ✅ | ✅ |
+| **复制路径** | ✅ | ✅ | ✅ | ✅（`ClipboardUtils`，已有依赖） |
+| **整目录复制进出** | — | ✅（见 §9.2） | ✅ | ✅ |
 
 **明确不做**（并写进页面提示）：
 - 不对 DB 做原地编辑（会绕过 GreenDAO 缓存与事务，极易损坏）；只读浏览 + 导出。
@@ -113,13 +115,9 @@ DataManagerActivity（标题：应用数据管理；toolbar 同 SettingsActivity
    - `.../data/InternalDataMap.kt`（~60 行，注释表 + 类型识别）
    - 布局 `app_activity_data_manager.xml`（toolbar + 概览 TextView + RecyclerView，30 行）
 3. **扫描**：`Dispatchers.IO` 递归 `listFiles()`，计算 `length()` 求和；只做一层懒加载（进入子目录再扫），避免上千文件卡顿。
-4. **导出**：`FileProvider.getUriForFile(...)` + `Intent.ACTION_SEND`（`application/octet-stream`）→ 用户自选目标（微信/文件管理器/网盘）。需要给 `app_file_paths.xml` 补：
-   ```xml
-   <files-path name="app_files" path="." />
-   <cache-path name="app_cache" path="." />
-   <external-files-path name="app_ext" path="." />
-   ```
-   （不加 `<root-path>`，避免把私有数据暴露给任意被授权应用。）
+4. **导出**：按 §9.2 复制到 `Download/YESPDF_data/...`；单个文件也可 `FileProvider.getUriForFile(...)` + `ACTION_SEND` 分享出去。
+   现有的 `app_file_paths.xml`（`<external-path name="yespdf" path="" />`）已覆盖 Download，**无需新增 `<files-path>` 或 `<root-path>`** ——
+   这同时避免了把私有目录授权给任意第三方应用（比"打开目录"更安全，也是选择中转目录方案的主因）。
 5. **DB 只读浏览**：`SQLiteDatabase.openDatabase(path, null, OPEN_READONLY)` 取 `sqlite_master` 列表与 `count(*)`；**不复用 GreenDAO session**，避免干扰写事务。
 6. **危险操作**：删除 DB 前 `AlertDialog` 二次确认 + 提示"应用将自动重建空库"；删除后需 `DBHelper` 重连（或提示重启应用）。
 7. **与 F2 联动**：F2 的 `PDF.pwdBlob` 写入后，DB 页可显示"已保存密码条目 N 个"（不显示明文）。
@@ -135,3 +133,67 @@ DataManagerActivity（标题：应用数据管理；toolbar 同 SettingsActivity
 | S5 | 封面替换（导入压缩复用 M1 的 ≤512px/≤2MB 规则） | 与 F4 合并 |
 
 **结论：可以在不引入任何新依赖、不动数据库结构的前提下，用一个 Activity + 一个 Adapter + 一张注释表完成**，风险集中在"删除/改名"两类操作，用二次确认与上限约束即可控制。
+
+---
+
+## 9. 决策记录（用户 2026-11-20 拍板）
+
+### 9.1 数据库整体删除 = "专用函数 + 强制退出"
+
+用户明确要求：**完全删掉时执行特定函数，警告这是危险操作；删除后下次启动会"部分恢复"（重建空库），大量数据永久丢失；确认后删除并立即退出应用，直到用户下次启动才重新初始化。**
+
+实现（`DataManagerActivity` 内，而不是散在 UI 回调里）：
+
+```kotlin
+/**
+ * 高危：删除书库数据库并立即退出进程。
+ * 下次冷启动时 DBHelper.init() 会用 DaoMaster 重建空库（"部分恢复"），
+ * 但阅读进度/书签/分组/已保存密码永久丢失，无法找回。
+ */
+private fun deleteDatabaseAndExit() {
+    // 1) 趁进程还活着，先把能"留个念想"的东西导出一份（可选，见 §9.2）
+    // 2) 关闭所有连接：DBHelper 重连前必须退出，否则 SQLite 仍持有已删除的 inode
+    //    这里不做热重连，直接交给下一次冷启动
+    deleteDatabase(AppConfig.DB_NAME)   // 同时删除 -wal / -shm / -journal
+    // 3) 清理残留：封面等派生文件按用户选择保留或一并删除
+    // 4) 立即退出，禁止后续任何写操作
+    finishAffinity()
+    android.os.Process.killProcess(android.os.Process.myPid())
+    exitProcess(0)
+}
+```
+
+确认交互（两级，全部复用现有 dialog）：
+
+1. 第一级 `createDoubleBtnDialog`：
+   > **删除整个书库数据库？**
+   > 这会删除书名索引、阅读进度、书签、分组以及已保存的密码。
+   > 你的**原始 PDF 文件不会被删除**。删除后应用会立即退出，下次启动会重建一个空书库 —— 届时这些数据将**永久无法恢复**。
+2. 第二级 `createDeleteDialog`（现有勾选框样式）：
+   - 勾选项 1：`同时删除封面缩略图`（默认勾选）
+   - 勾选项 2：`我已导出备份`（不勾选则按钮禁用，除非用户勾"我确认不需要备份"）
+3. 确认后走 `deleteDatabaseAndExit()`。
+
+关键点：**不热重连 DB**。GreenDAO 的 `DaoSession`/`SQLiteDatabase` 已打开的连接在文件被删后仍指向旧 inode，热重连极易出现"写入落到幽灵文件"的问题，直接退出是唯一干净的做法。
+
+### 9.2 目录"复制进出"（零新增依赖）
+
+用户要求允许目录复制进出。**不引入 `androidx.documentfile`**（当前依赖树里没有），采用固定中转目录方案，全流程只用现有权限（`READ/WRITE_EXTERNAL_STORAGE` 已在 manifest，且 `targetSdk 28` 走旧存储模型可直接写外部存储）：
+
+| 方向 | 方案 | 交互 |
+|---|---|---|
+| **导出（复制出去）** | 递归复制到 `Download/YESPDF_data/<yyyyMMdd_HHmmss>/`，写一份 `manifest.txt`（原路径、大小、注释、导出时间） | 长按目录 →「导出此目录」；或概览行「一键导出全部」 |
+| **导入（复制进来）** | 读取 `Download/YESPDF_restore/`（或用户通过系统文件管理器放到该处的目录），逐项复制回内部对应位置 | 长按目标目录 →「从备份导入」→ 列出 `YESPDF_restore/` 下的候选目录供选择 |
+| **单个文件导入** | `ACTION_OPEN_DOCUMENT` + `ContentResolver.openInputStream()`（零依赖），用于替换封面/覆盖 SP | 条目 →「替换内容」 |
+
+导入的安全约束：
+
+- **数据库文件导入后同样强制退出**（与 §9.1 同一条路径），提示"导入将在下次启动生效"，避免连接错乱；
+- SP 导入后提示"设置将在重启后生效"；
+- 覆盖前统一 `createDoubleBtnDialog` 确认，并自动把被覆盖文件先备份到 `Download/YESPDF_data/_before_import_<时间>/`（这样"进出"互为保险）。
+- 所有复制都在 `Dispatchers.IO` 上带进度回调，超过 50MB 或文件数 > 500 时先估算并提示预计耗时。
+
+### 9.3 已确认的 UI 细节
+
+- 入口文案「**管理**」，图标复用 `app_ic_folder_yellow_24dp`，位置在 `app_pw_main.xml` 的「设置」与「关于」之间（即「关于」上方）。
+- 条目操作菜单包含「**复制路径**」（`ClipboardUtils.copyText`，blankj 已提供，零新增依赖）。
