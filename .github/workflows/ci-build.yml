@@ -51,8 +51,22 @@ jobs:
           SDKMANAGER="$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)"
           echo "sdkmanager: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          "$SDKMANAGER" --install "platforms;android-29" "build-tools;28.0.3" "platform-tools"
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          # 关键：不把 runner 预装的几十个新版 SDK 包暴露给 AGP 3.4.1，
+          # 否则它用自带的旧 com.android.repository 解析新元数据会喷上万行
+          # "cvc-complex-type.2.4.a ... base-extension" + XML 栈，纯噪声且拖慢构建。
+          MINI_SDK="$HOME/android-sdk-mini"
+          rm -rf "$MINI_SDK"; mkdir -p "$MINI_SDK"
+          "$SDKMANAGER" --sdk_root="$MINI_SDK" --install \
+            "platforms;android-29" "build-tools;28.0.3" "platform-tools" > /dev/null
+          # 许可协议必须落在新 sdk_root 下，否则 AGP 会报 license not accepted
+          cp -a "$ANDROID_SDK_ROOT/licenses" "$MINI_SDK/licenses" 2>/dev/null || true
+          cp -a "$ANDROID_SDK_ROOT/tools" "$MINI_SDK/tools" 2>/dev/null || true
+          {
+            echo "ANDROID_SDK_ROOT=$MINI_SDK"
+            echo "ANDROID_HOME=$MINI_SDK"
+          } >> "$GITHUB_ENV"
+          echo "sdk.dir=$MINI_SDK" > local.properties
+          ls "$MINI_SDK"
 
       - name: Prepare optional release keystore
         env:
