@@ -77,8 +77,43 @@ object DialogManager {
         return DialogUtils.createBottomSheetDialog(context, view)
     }
 
-    fun createGiftDialog(context: Context, callback: (Button, Button) -> Unit): BottomSheetDialog {
+    /**
+     * 夜间显示模式二选一：反色（黑白文档）/ 蒙版（彩色文档）。
+     * 视觉沿用现有的白底 BottomSheet，不引入新样式。
+     */
+    fun createNightModeDialog(context: Context, current: Int, callback: (Int, BottomSheetDialog) -> Unit): BottomSheetDialog {
         val view = LayoutInflater.from(context.applicationContext)
+                .inflate(R.layout.app_bottomdialog_night_mode, null)
+        val llInvert = view.findViewById<View>(R.id.app_ll_invert)
+        val llMask = view.findViewById<View>(R.id.app_ll_mask)
+        val ivInvert = view.findViewById<ImageView>(R.id.app_iv_invert_check)
+        val ivMask = view.findViewById<ImageView>(R.id.app_iv_mask_check)
+        val btnCancel = view.findViewById<Button>(R.id.app_btn_cancel)
+        val dialog = DialogUtils.createBottomSheetDialog(context, view)
+
+        fun render(checked: Int) {
+            ivInvert.setImageResource(
+                    if (checked == Settings.NIGHT_DISPLAY_INVERT) R.drawable.app_ic_check_circle_red_24dp
+                    else R.drawable.app_ic_unchecked_grey_24dp)
+            ivMask.setImageResource(
+                    if (checked == Settings.NIGHT_DISPLAY_MASK) R.drawable.app_ic_check_circle_red_24dp
+                    else R.drawable.app_ic_unchecked_grey_24dp)
+        }
+
+        render(current)
+        llInvert.setOnClickListener {
+            render(Settings.NIGHT_DISPLAY_INVERT)
+            callback(Settings.NIGHT_DISPLAY_INVERT, dialog)
+        }
+        llMask.setOnClickListener {
+            render(Settings.NIGHT_DISPLAY_MASK)
+            callback(Settings.NIGHT_DISPLAY_MASK, dialog)
+        }
+        btnCancel.setOnClickListener { dialog.dismiss() }
+        return dialog
+    }
+
+    fun createGiftDialog(context: Context, callback: (Button, Button) -> Unit): BottomSheetDialog {        val view = LayoutInflater.from(context.applicationContext)
                 .inflate(R.layout.app_bottomdialog_gift, null)
         val btnOpenQrcode = view.findViewById<Button>(R.id.app_btn_open_qrcode)
         val btnGoWechat = view.findViewById<Button>(R.id.app_btn_go_wechat)

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  夜间显示模式选择：反色 / 蒙版 二选一。
+  结构与配色完全沿用 app_bottomdialog_delete.xml（白底圆角 + 粗体标题 + 分隔线 + 强调色按钮），
+  避免引入新的视觉语言。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/app_shape_round_rect_white">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="24dp"
+        android:textStyle="bold"
+        android:textColor="@color/base_black"
+        android:textSize="@dimen/base_text_xxhlarge"
+        android:text="@string/app_night_display" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="8dp"
+        android:textSize="@dimen/base_text_small"
+        android:textColor="@color/base_black_shallow"
+        android:lineSpacingExtra="3dp"
+        android:text="@string/app_night_display_hint" />
+
+    <!-- 反色 -->
+    <LinearLayout
+        android:id="@+id/app_ll_invert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="14dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_inverse"
+            android:contentDescription="@string/app_night_invert" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/base_text_large"
+                android:textColor="@color/base_black"
+                android:text="@string/app_night_invert" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="@dimen/base_text_small"
+                android:textColor="@color/base_black_shallow"
+                android:text="@string/app_night_invert_desc" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/app_iv_invert_check"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_unchecked_grey_24dp"
+            android:contentDescription="@string/app_night_invert" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:background="@color/base_black_divider_shallow" />
+
+    <!-- 蒙版 -->
+    <LinearLayout
+        android:id="@+id/app_ll_mask"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="14dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_image_white_24dp"
+            android:contentDescription="@string/app_night_mask" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/base_text_large"
+                android:textColor="@color/base_black"
+                android:text="@string/app_night_mask" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="@dimen/base_text_small"
+                android:textColor="@color/base_black_shallow"
+                android:text="@string/app_night_mask_desc" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/app_iv_mask_check"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_unchecked_grey_24dp"
+            android:contentDescription="@string/app_night_mask" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/base_black_divider_shallow" />
+
+    <Button
+        android:id="@+id/app_btn_cancel"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@null"
+        android:textStyle="bold"
+        android:textSize="@dimen/base_text_large"
+        android:text="@string/app_cancel"
+        tools:ignore="DuplicateSpeakableTextCheck" />
+
+</LinearLayout>

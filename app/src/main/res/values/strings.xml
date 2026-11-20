@@ -24,6 +24,13 @@
     <string name="app_oop_error">Oops… Error</string>
     <string name="app_doc_parse_error">Document parsing error</string>
     <string name="app_exit_cur_content">Exit the current page</string>
+    <string name="app_night_display">Night display</string>
+    <string name="app_night_display_hint">Use Invert for black-and-white documents, Mask for colored ones — pick one.</string>
+    <string name="app_night_invert">Invert</string>
+    <string name="app_night_invert_desc">Negative colors, best for pure black-and-white text</string>
+    <string name="app_night_mask">Mask</string>
+    <string name="app_night_mask_desc">Keeps original colors, only lowers brightness</string>
+    <string name="app_night_long_press_tip">Long press the night button to switch between Invert and Mask</string>
     <string name="app_notice">Attention！</string>
     <string name="app_whether_delete_recent">This operation will delete %d recent reading records (without clearing the reading progress). Do you want to continue?</string>
     <string name="app_whether_delete_all">This operation will delete %d books (including reading progress and bookmarks, etc. without affecting the source file). Do you want to continue?</string>

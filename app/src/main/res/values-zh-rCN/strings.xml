@@ -22,6 +22,13 @@
     <string name="app_oop_error">哎呀，出错了</string>
     <string name="app_doc_parse_error">文档解析错误</string>
     <string name="app_exit_cur_content">退出当前页面</string>
+    <string name="app_night_display">夜间显示</string>
+    <string name="app_night_display_hint">黑白文件用「反色」，彩色文件用「蒙版」，二选一。</string>
+    <string name="app_night_invert">反色</string>
+    <string name="app_night_invert_desc">负片效果，适合纯黑白文字</string>
+    <string name="app_night_mask">蒙版</string>
+    <string name="app_night_mask_desc">保留原始配色，仅降低亮度</string>
+    <string name="app_night_long_press_tip">长按此按钮可切换「反色 / 蒙版」</string>
     <string name="app_notice">注意！</string>
     <string name="app_whether_delete_recent">本次操作将会删除 %d 个最近阅读记录（不清除阅读进度），是否继续？</string>
     <string name="app_whether_delete_all">本次操作将会删除 %d 本书籍（包含阅读进度与书签等，不影响源文件），是否继续？</string>

@@ -73,17 +73,27 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
     private val scale200: TextView by lazy { findViewById<TextView>(R.id.app_scale_2_00) }
     private val scale300: TextView by lazy { findViewById<TextView>(R.id.app_scale_3_00) }
     private val nightModeBtn: View by lazy { findViewById<View>(R.id.app_night_btn) }
-    private val isNightMode: MutableLiveData<Boolean> = MutableLiveData<Boolean>().apply {
-        observe(this@PreviewActivity::getLifecycle) {
-            Settings.nightMode = it
+    /**
+     * 夜间显示模式：关闭 / 反色 / 蒙版。
+     * - 反色：PDFView 内部负片 ColorMatrix，适合黑白文档
+     * - 蒙版：覆盖在 PDFView 之上的半透明黑层，保留彩色，适合彩色文档
+     */
+    private val nightDisplay: MutableLiveData<Int> = MutableLiveData<Int>().apply {
+        observe(this@PreviewActivity::getLifecycle) { mode ->
+            Settings.nightDisplay = mode
+            // 兼容旧字段：其它地方仍可能读 Settings.nightMode
+            Settings.nightMode = mode == Settings.NIGHT_DISPLAY_INVERT
 
-            if (it) {
+            if (mode == Settings.NIGHT_DISPLAY_INVERT) {
                 app_pdfview_bg.setImageResource(R.drawable.app_ic_placeholder_white)
                 app_pdfview_bg.setBackgroundColor(Color.BLACK)
             } else {
                 app_pdfview_bg.setImageResource(R.drawable.app_ic_placeholder_black)
                 app_pdfview_bg.setBackgroundColor(Color.WHITE)
             }
+            applyNightMask(mode)
+            syncNightBtn(mode)
+
             scaleViewParentAnim(0.0f, 0L, object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator?) {
                     scaleLevel.visibility = View.GONE
@@ -93,8 +103,8 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
 
             initPdf(uri, pdf)
 
-            val textColor = if (it) R.color.base_black else R.color.base_white
-            val bg = if (it) R.drawable.app_shape_bg_scale_view_white else R.drawable.app_shape_bg_scale_view_black
+            val textColor = if (mode == Settings.NIGHT_DISPLAY_INVERT) R.color.base_black else R.color.base_white
+            val bg = if (mode == Settings.NIGHT_DISPLAY_INVERT) R.drawable.app_shape_bg_scale_view_white else R.drawable.app_shape_bg_scale_view_black
             scales.forEach { tv ->
                 tv.setTextColor(resources.getColor(textColor))
                 tv.background = resources.getDrawable(bg)
@@ -449,11 +459,10 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
             lp.height = ViewGroup.LayoutParams.MATCH_PARENT
             app_pdfview_bg.layoutParams = lp
         }
-        isNightMode.value = Settings.nightMode
-        nightModeBtn.isSelected = isNightMode.value == true
-        nightModeBtn.background = if (nightModeBtn.isSelected) {
-            resources.getDrawable(R.drawable.app_shape_circle_white_alpha)
-        } else resources.getDrawable(R.drawable.app_shape_circle_black_alpha)
+        Settings.migrateNightDisplayIfNeeded()
+        nightDisplay.value = Settings.nightDisplay
+        syncNightBtn(Settings.nightDisplay)
+        applyNightMask(Settings.nightDisplay)
         // 移动到屏幕下方
         app_ll_read_method.translationY = ScreenUtils.getScreenHeight().toFloat()
         app_ll_more.translationY = ScreenUtils.getScreenHeight().toFloat()
@@ -802,13 +811,23 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
                 initPdf(uri, pdf)
             }
         }
+        // 单击：在「关闭 ↔ 上次启用的模式」之间切换；长按：反色/蒙版二选一
         nightModeBtn.setOnClickListener {
-            it ?: return@setOnClickListener
-            it.isSelected = !it.isSelected
-            nightModeBtn.background = if (it.isSelected) {
-                resources.getDrawable(R.drawable.app_shape_circle_white_alpha)
-            } else resources.getDrawable(R.drawable.app_shape_circle_black_alpha)
-            isNightMode.value = it.isSelected
+            val cur = Settings.nightDisplay
+            val target = if (cur == Settings.NIGHT_DISPLAY_OFF) Settings.lastNightDisplay
+            else Settings.NIGHT_DISPLAY_OFF
+            nightDisplay.value = target
+            if (!Settings.nightTipShown) {
+                Settings.nightTipShown = true
+                UiManager.showCenterShort(R.string.app_night_long_press_tip)
+            }
+        }
+        nightModeBtn.setOnLongClickListener {
+            DialogManager.createNightModeDialog(this, Settings.nightDisplay) { mode, dialog ->
+                dialog.dismiss()
+                nightDisplay.value = mode
+            }.show()
+            true
         }
         sbScrollLevel.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -1012,7 +1031,7 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
         }
         configurator.disableLongpress()
                 .swipeHorizontal(Settings.swipeHorizontal)
-                .nightMode(isNightMode.value == true)
+                .nightMode(Settings.nightDisplay == Settings.NIGHT_DISPLAY_INVERT)
                 .pageFling(Settings.swipeHorizontal)
                 .pageSnap(Settings.swipeHorizontal)
                 .enableDoubletap(false)
@@ -1057,7 +1076,9 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
     }
 
     private fun initBgSize() {
-        if (isNightMode.value != true) {
+        // 反色模式下背景恒为黑色（负片后纸张变黑），无需按页面尺寸铺底；
+        // 蒙版模式背景保持白色，仅在其上叠加半透明黑层。
+        if (Settings.nightDisplay != Settings.NIGHT_DISPLAY_INVERT) {
             if (Settings.swipeHorizontal) {
                 val page = (app_pdfview.pageCount / 2.toFloat()).roundToInt()
                 val sizeF = app_pdfview.getPageSize(page)
@@ -1072,6 +1093,25 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
                 app_pdfview_bg.layoutParams = lp
             }
         }
+    }
+
+    /**
+     * 同步"蒙版"覆盖层：仅蒙版模式可见，强度取设置项（默认 65%）。
+     */
+    private fun applyNightMask(mode: Int) {
+        app_night_mask.visibility = if (mode == Settings.NIGHT_DISPLAY_MASK) View.VISIBLE else View.GONE
+        app_night_mask.alpha = Settings.nightMaskAlpha / 100f
+    }
+
+    /**
+     * 同步左下角夜间按钮的选中态（关闭=深色圆底，任一模式启用=白色圆底）。
+     */
+    private fun syncNightBtn(mode: Int) {
+        val enabled = mode != Settings.NIGHT_DISPLAY_OFF
+        nightModeBtn.isSelected = enabled
+        nightModeBtn.background = if (enabled) {
+            resources.getDrawable(R.drawable.app_shape_circle_white_alpha)
+        } else resources.getDrawable(R.drawable.app_shape_circle_black_alpha)
     }
 
     private fun initAboutPage() {

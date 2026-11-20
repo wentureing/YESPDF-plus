@@ -26,6 +26,19 @@
         android:layout_height="match_parent"
         android:background="@color/base_transparent"/>
 
+    <!-- 夜间"蒙版"模式：盖在 PDF 之上的半透明黑层。
+         与"反色"的区别是保留原始色相，只压亮度，适合彩色文档。
+         放在 PDFView 之后、其余 UI 之前，天然处于正确层级；不拦截触摸。 -->
+    <View
+        android:id="@+id/app_night_mask"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0.65"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone" />
+
     <!-- 缩放等级 -->
     <LinearLayout
         android:id="@+id/app_scale_level"
