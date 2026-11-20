@@ -3,6 +3,62 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- 扫描范围与排除规则入口：复用文件列表行的视觉（图标 + 标题 + 摘要 + 箭头） -->
+    <LinearLayout
+        android:id="@+id/app_ll_scan_rule"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="?selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_action_settings_black"
+            android:contentDescription="@string/app_scan_rule" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/base_black"
+                android:textSize="@dimen/base_text_normal"
+                android:textStyle="bold"
+                android:text="@string/app_scan_rule" />
+
+            <TextView
+                android:id="@+id/app_tv_scan_rule_summary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/base_black_shallow"
+                android:textSize="@dimen/base_text_small"
+                android:text="@string/app_scan_rule_off" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="16dp"
+            android:src="@drawable/app_ic_navigate_next_black_20dp"
+            android:contentDescription="@string/app_scan_rule" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        android:background="@color/base_black_divider_shallow" />
+
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="0dp"

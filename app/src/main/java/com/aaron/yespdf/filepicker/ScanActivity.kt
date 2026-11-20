@@ -23,6 +23,7 @@ import com.aaron.yespdf.R
 import com.aaron.yespdf.common.CommonActivity
 import com.aaron.yespdf.common.DialogManager
 import com.aaron.yespdf.common.GroupingAdapter
+import com.aaron.yespdf.common.ScanRules
 import com.aaron.yespdf.common.UiManager
 import com.aaron.yespdf.filepicker.ScanActivity
 import com.blankj.utilcode.util.KeyboardUtils
@@ -62,7 +63,7 @@ class ScanActivity : CommonActivity() {
     private var stopScan = false
     private var newGroupName: String? = null
     private var threadPool: ExecutorService? = null
-    private val listable: IListable = ByNameListable()
+    private val listable: IListable = ByNameListable(ScanRuleFilter())
 
     private var adapter: ViewAllAdapter? = null
 
@@ -257,10 +258,17 @@ class ScanActivity : CommonActivity() {
 
     private fun traverseFile(): Double {
         val start = System.currentTimeMillis()
-        val result = SDCardUtils.getSDCardInfo()
-        for (info in result) {
-            if (!stopScan && "mounted" == info.state) {
-                traverse(File(info.path))
+        // 规则未启用（默认）：行为与旧版一致，遍历所有已挂载存储卷。
+        // 规则启用：只从「默认扫描目录」出发；该集合为空时回退到全部卷。
+        val fallbackRoots = SDCardUtils.getSDCardInfo()
+                .filter { "mounted" == it.state }
+                .map { it.path }
+        val roots = ScanRules.effectiveRoots(fallbackRoots)
+        for (path in roots) {
+            if (stopScan) break
+            val root = File(path)
+            if (root.exists() && root.isDirectory) {
+                traverse(root)
             }
         }
         while (true) {

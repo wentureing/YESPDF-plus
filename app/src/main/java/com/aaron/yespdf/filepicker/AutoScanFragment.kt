@@ -10,6 +10,7 @@ import androidx.fragment.app.Fragment
 import com.aaron.base.impl.OnClickListenerImpl
 import com.aaron.yespdf.R
 import com.aaron.yespdf.common.CommonFragment
+import com.aaron.yespdf.common.ScanRules
 import kotlinx.android.synthetic.main.app_fragment_auto_scan.*
 import java.util.*
 
@@ -30,6 +31,7 @@ class AutoScanFragment : CommonFragment() {
         (activity as SelectActivity).ibtnSelectAll.visibility = View.GONE
         (activity as SelectActivity).ibtnSearch.visibility = View.GONE
         view?.post { (activity as SelectActivity).closeSearchView() }
+        updateRuleSummary()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -45,10 +47,36 @@ class AutoScanFragment : CommonFragment() {
                 ScanActivity.start(activity, (activity as SelectActivity).importeds as ArrayList<String?>, SelectActivity.REQUEST_CODE)
             }
         })
+        app_ll_scan_rule.setOnClickListener(object : OnClickListenerImpl() {
+            override fun onViewClick(v: View, interval: Long) {
+                ScanRuleActivity.startForResult(activity, REQUEST_CODE_RULE)
+            }
+        })
+        updateRuleSummary()
+    }
+
+    /**
+     * 入口行右侧摘要：未启用时提示"未启用"，启用时给出扫描目录与排除项计数。
+     */
+    private fun updateRuleSummary() {
+        val summary = if (!ScanRules.enabled) {
+            getString(R.string.app_scan_rule_off)
+        } else {
+            val roots = if (ScanRules.includeDirs.isEmpty()) {
+                getString(R.string.app_scan_rule_summary_all)
+            } else {
+                getString(R.string.app_scan_rule_summary_dirs, ScanRules.includeDirs.size)
+            }
+            getString(R.string.app_scan_rule_summary_fmt, roots,
+                    ScanRules.excludeDirs.size, ScanRules.excludeFiles.size)
+        }
+        app_tv_scan_rule_summary.text = summary
     }
 
     companion object {
         private const val REQUEST_CODE = 1
+        private const val REQUEST_CODE_RULE = 2
+
         fun newInstance(): Fragment {
             return AutoScanFragment()
         }
