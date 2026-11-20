@@ -76,6 +76,31 @@ object DocumentTreeHelper {
         return result
     }
 
+    /** 递归收集一棵目录树下的所有文件（不含目录本身），用于"自动落位恢复" */
+    fun collectFiles(resolver: ContentResolver, treeUri: Uri, maxFiles: Int = 3000): List<DocEntry> {
+        val result = ArrayList<DocEntry>()
+        fun walk(parentDocId: String) {
+            if (result.size >= maxFiles) return
+            for (entry in listChildren(resolver, treeUri, parentDocId)) {
+                if (entry.isDir) {
+                    try {
+                        walk(DocumentsContract.getDocumentId(entry.uri))
+                    } catch (e: Throwable) {
+                        // 个别 provider 不支持继续下钻，跳过该子树
+                    }
+                } else {
+                    result.add(entry)
+                    if (result.size >= maxFiles) return
+                }
+            }
+        }
+        try {
+            walk(DocumentsContract.getTreeDocumentId(treeUri))
+        } catch (e: Throwable) {
+        }
+        return result
+    }
+
     /** 递归复制整个目录树到 [targetDir] */
     fun copyTreeToDir(resolver: ContentResolver, treeUri: Uri, targetDir: File): Int {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)

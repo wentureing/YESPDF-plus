@@ -165,18 +165,27 @@ object DBHelper {
     }
 
     fun deleteCollection(name: String?): String? {
+        // 删除前先取出该分组下的书籍，用于删除后清理封面文件。
+        // 用显式 null 判断而不是 isNullOrEmpty()：Kotlin 1.3 的后者没有 contract，
+        // 智能转换不生效，queryPDF(name) 会被推断成 String? 而报错。
+        val affected: List<PDF> = if (name == null || name.isEmpty()) emptyList() else queryPDF(name)
         sDaoSession.database.execSQL("delete from COLLECTION where name = ?", arrayOf(name))
+        CoverCleaner.purge(affected)
         return name
     }
 
     fun deleteCollection(list: List<Cover>): List<String> {
         val dirList: MutableList<String> = ArrayList()
+        val affected: MutableList<PDF> = ArrayList()
         for (c in list) {
             dirList.add(c.name)
+            // 收集待删书籍，用于稍后清理封面
+            affected.addAll(queryPDF(c.name))
             sDaoSession.database.execSQL("delete from Collection where name = ?", arrayOf(c.name))
             sDaoSession.database.execSQL("delete from PDF where dir = ?", arrayOf(c.name))
             sDaoSession.database.execSQL("delete from RECENT_PDF where dir = ?", arrayOf(c.name))
         }
+        CoverCleaner.purge(affected)
         return dirList
     }
 
@@ -187,6 +196,8 @@ object DBHelper {
                 nameList.add(pdf.name)
                 sDaoSession.pdfDao.delete(pdf)
             }
+            // 记录已删除后再清理封面：CoverCleaner 内部会跳过仍被引用的封面
+            CoverCleaner.purge(list)
         }
         return nameList
     }

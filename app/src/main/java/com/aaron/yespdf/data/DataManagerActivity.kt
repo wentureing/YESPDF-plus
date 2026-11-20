@@ -33,6 +33,7 @@ import com.github.anzewei.parallaxbacklayout.ParallaxBack
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.android.synthetic.main.app_activity_data_manager.*
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -98,6 +99,7 @@ class DataManagerActivity : CommonActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.app_menu_auto_restore -> pickAutoRestore()
             R.id.app_menu_import_files -> pickImportFiles()
             R.id.app_menu_import_dir -> pickImportTree()
             R.id.app_menu_export_dir -> pickExportTree()
@@ -118,6 +120,108 @@ class DataManagerActivity : CommonActivity() {
                 .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         startActivityForResult(intent, REQ_IMPORT_FILES)
+    }
+
+    /**
+     * 「从备份自动恢复」：只需选一次备份目录，应用按文件类型各自归位，不再依赖"当前在哪个目录"。
+     *
+     * - yespdf.db            → databases/（覆盖前自动备份成 yespdf.db.bak-<时间戳>）
+     * - spUtils.xml 等设置   → shared_prefs/（跳过 umeng 残留）
+     * - .jpg / .png          → 应用数据根目录（PDF.COVER 记录的绝对路径就在这里）
+     *
+     * 这样即使用户选了 YESPDF_restore 这种"包含 db/ sp/ covers/ 的备份根目录"也不会放错。
+     */
+    private fun pickAutoRestore() {
+        showAutoRestoreTipIfNeeded {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            startActivityForResult(intent, REQ_AUTO_RESTORE)
+        }
+    }
+
+    private fun showAutoRestoreTipIfNeeded(action: () -> Unit) {
+        if (SPStaticUtils.getBoolean(SP_AUTO_RESTORE_TIP, false)) {
+            action()
+            return
+        }
+        SPStaticUtils.put(SP_AUTO_RESTORE_TIP, true)
+        var dialog: Dialog? = null
+        dialog = DialogManager.createDoubleBtnDialog(this) { tvTitle, tvContent, btnLeft, btnRight ->
+            tvTitle.setText(R.string.app_data_auto_restore_tip_title)
+            tvContent.setText(R.string.app_data_auto_restore_tip_content)
+            btnLeft.setText(R.string.app_cancel)
+            btnLeft.setOnClickListener { dialog?.dismiss() }
+            btnRight.setText(R.string.app_data_auto_restore_go)
+            btnRight.setOnClickListener {
+                dialog?.dismiss()
+                action()
+            }
+        }
+        dialog?.show()
+    }
+
+    private fun handleAutoRestore(treeUri: Uri) {
+        DocumentTreeHelper.takePermissions(contentResolver, treeUri)
+        val dataDir = filesDir.parentFile
+        val dbDir = File(dataDir, "databases")
+        val spDir = File(dataDir, "shared_prefs")
+        UiManager.showShort(R.string.app_data_auto_restore_running)
+        Thread {
+            val docs = DocumentTreeHelper.collectFiles(contentResolver, treeUri)
+            var db = 0
+            var sp = 0
+            var img = 0
+            for (doc in docs) {
+                val name = doc.name
+                val lower = name.toLowerCase()
+                try {
+                    when {
+                        name.equals(AppConfig.DB_NAME, ignoreCase = true) -> {
+                            if (!dbDir.exists()) dbDir.mkdirs()
+                            val dst = File(dbDir, AppConfig.DB_NAME)
+                            if (dst.exists()) InternalDataScanner.backupBeforeOverwrite(dst)
+                            contentResolver.openInputStream(doc.uri)?.use { input ->
+                                FileOutputStream(dst).use { output -> input.copyTo(output) }
+                            }
+                            db++
+                        }
+                        lower.endsWith(".xml") &&
+                                !lower.startsWith("umeng") && !lower.startsWith("um_") &&
+                                (lower.startsWith("sp") || lower.contains("pref")) -> {
+                            if (!spDir.exists()) spDir.mkdirs()
+                            val dst = File(spDir, name)
+                            contentResolver.openInputStream(doc.uri)?.use { input ->
+                                FileOutputStream(dst).use { output -> input.copyTo(output) }
+                            }
+                            sp++
+                        }
+                        lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") -> {
+                            if (dataDir != null) {
+                                val dst = File(dataDir, name)
+                                contentResolver.openInputStream(doc.uri)?.use { input ->
+                                    FileOutputStream(dst).use { output -> input.copyTo(output) }
+                                }
+                                img++
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    // 单个文件失败不影响其余
+                }
+            }
+            val countDb = db; val countSp = sp; val countImg = img
+            runOnUiThread {
+                refresh()
+                if (countDb == 0 && countSp == 0 && countImg == 0) {
+                    UiManager.showCenterShort(R.string.app_data_auto_restore_none)
+                } else {
+                    UiManager.showShort(getString(R.string.app_data_auto_restore_done,
+                            countDb, countSp, countImg))
+                    // 恢复数据库后需要重启才生效
+                    if (countDb > 0) promptRestartAfterDbImport()
+                }
+            }
+        }.start()
     }
 
     /** 选文件夹：只有 OPEN_DOCUMENT_TREE 能选目录，侧边栏也只会列出支持建目录的根 */
@@ -152,6 +256,7 @@ class DataManagerActivity : CommonActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != Activity.RESULT_OK || data == null) return
         when (requestCode) {
+            REQ_AUTO_RESTORE -> data.data?.let { handleAutoRestore(it) }
             REQ_IMPORT_FILES -> handleImportFiles(data)
             REQ_IMPORT_TREE -> data.data?.let { handleImportTree(it) }
             REQ_EXPORT_TREE -> data.data?.let { handleExportTree(it) }
@@ -736,7 +841,9 @@ class DataManagerActivity : CommonActivity() {
 
     companion object {
         private const val SP_TIP_SHOWN = "SP_DATA_MANAGER_TIP_SHOWN"
+        private const val SP_AUTO_RESTORE_TIP = "SP_AUTO_RESTORE_TIP_SHOWN"
 
+        private const val REQ_AUTO_RESTORE = 2000
         private const val REQ_IMPORT_FILES = 2001
         private const val REQ_IMPORT_TREE = 2002
         private const val REQ_EXPORT_TREE = 2003

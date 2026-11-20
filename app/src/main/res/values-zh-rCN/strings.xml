@@ -137,6 +137,19 @@
     <string name="app_data_intro_skip">以后再说</string>
     <string name="app_data_intro_ok">我知道了</string>
     <string name="app_data_import_files">从系统导入文件…</string>
+    <string name="app_data_auto_restore">从备份自动恢复…</string>
+    <string name="app_data_auto_restore_tip_title">从备份自动恢复</string>
+    <string name="app_data_auto_restore_tip_content">选择备份目录后，应用会按文件类型自动归位：
+· yespdf.db → databases
+· spUtils.xml 等设置 → shared_prefs
+· 封面图片 → 应用数据根目录
+
+覆盖前会自动把旧文件备份成 xxx.bak-时间戳。
+建议直接选备份根目录（含 db/、sp/、covers/ 也行），不用关心当前在哪个目录。</string>
+    <string name="app_data_auto_restore_go">选择备份目录</string>
+    <string name="app_data_auto_restore_running">正在恢复…</string>
+    <string name="app_data_auto_restore_done">已恢复：数据库 %1$d、设置 %2$d、封面 %3$d</string>
+    <string name="app_data_auto_restore_none">所选位置没有可恢复的文件（需要 yespdf.db / spUtils.xml / 封面图片）</string>
     <string name="app_data_import_dir">从系统导入文件夹…</string>
     <string name="app_data_export_dir">导出到文件夹…</string>
     <string name="app_data_refresh">刷新</string>

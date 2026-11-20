@@ -139,6 +139,19 @@
     <string name="app_data_intro_skip">Later</string>
     <string name="app_data_intro_ok">Got it</string>
     <string name="app_data_import_files">Import files from device…</string>
+    <string name="app_data_auto_restore">Restore from backup (auto-place)…</string>
+    <string name="app_data_auto_restore_tip_title">Restore from backup</string>
+    <string name="app_data_auto_restore_tip_content">Pick the backup folder once and the app will place files automatically:
+· yespdf.db → databases
+· settings xml → shared_prefs
+· cover images → app data root
+
+Old files are backed up as xxx.bak-<timestamp> before overwrite.
+You can safely pick the backup root folder (containing db/, sp/, covers/).</string>
+    <string name="app_data_auto_restore_go">Pick backup folder</string>
+    <string name="app_data_auto_restore_running">Restoring…</string>
+    <string name="app_data_auto_restore_done">Restored: %1$d database(s), %2$d setting(s), %3$d cover(s)</string>
+    <string name="app_data_auto_restore_none">Nothing restorable in that folder (need yespdf.db / spUtils.xml / cover images)</string>
     <string name="app_data_import_dir">Import a folder from device…</string>
     <string name="app_data_export_dir">Export to a folder…</string>
     <string name="app_data_refresh">Refresh</string>

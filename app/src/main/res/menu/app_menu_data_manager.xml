@@ -3,6 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/app_menu_auto_restore"
+        android:title="@string/app_data_auto_restore"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/app_menu_import_files"
         android:title="@string/app_data_import_files"
         app:showAsAction="never" />
