@@ -100,6 +100,18 @@ jobs:
           distribution: temurin
           java-version: '8'
 
+      # 没有正式密钥就拒绝出包：debug 密钥人人可伪造，绝不能用于正式发布
+      - name: Require release keystore
+        if: github.event_name == 'push'
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::error::未配置 KEYSTORE_B64，拒绝用 debug 签名发布 release 包"
+            exit 1
+          fi
+          echo "release keystore secret present"
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
@@ -121,6 +133,27 @@ jobs:
             cp app/build/outputs/mapping/release/mapping.txt out/mapping-release.txt
           fi
           ls -lh out
+
+      # 校验签名并公开指纹，供用户核对下载到的 APK 确实出自本项目
+      - name: Verify signature and record fingerprint
+        run: |
+          set -euo pipefail
+          APK="$(ls out/*release*.apk | head -1)"
+          APKSIGNER="$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | head -1)"
+          CERTS="$("$APKSIGNER" verify --print-certs "$APK" | tee /dev/stderr)"
+          FP="$(echo "$CERTS" | grep -i 'SHA-256 digest' | head -1 | sed 's/.*: //')"
+          SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          echo "CERT_SHA256=$FP" >> "$GITHUB_ENV"
+          echo "APK_SHA256=$SHA" >> "$GITHUB_ENV"
+          {
+            echo "### 签名与校验"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "|---|---|"
+            echo "| APK | \`$(basename "$APK")\` |"
+            echo "| 证书 SHA-256 | \`$FP\` |"
+            echo "| APK SHA-256 | \`$SHA\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -197,6 +230,9 @@ jobs:
             --notes "版本 v2.3.${{ github.run_number }}（提交 ${GITHUB_SHA::7}，分支 ${{ github.ref_name }}）
 
           构建记录：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          签名证书 SHA-256：${CERT_SHA256}
+          APK SHA-256：${APK_SHA256}
 
           本 Release 由 CI 滚动更新，始终只保留最新一份 APK；同一构建也镜像在 release 分支根目录。"
           echo "published release latest with ${APK_NAME}"

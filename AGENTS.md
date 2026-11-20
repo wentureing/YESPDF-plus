@@ -69,6 +69,11 @@
 
 ## 六、安全
 
+- **签名策略（正式发布口径）**：release 只允许正式密钥签名，密钥与口令只存在于
+  `GitHub Secrets`（`KEYSTORE_B64` / `STORE_ALIAS` / `KEYSTORE_PASSWORD` / `KEY_PASSWORD`）与本地 `.secrets/`，
+  绝不入库；没有密钥时 CI 直接失败，**禁止**用 debug 密钥发布 release。
+  证书 SHA-256 指纹公开在 README 与每次 Release 说明中。
+
 - `.secrets/`（含 GitHub PAT）永不入库，`.gitignore` 已覆盖。
 - 不读取、不输出、不回显凭据内容；只在需要时使用其路径。
 - 用户密码：仅以 Android Keystore 加密后的密文存库，任何 UI / 日志都不得回显明文。

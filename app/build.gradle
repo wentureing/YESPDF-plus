@@ -75,8 +75,12 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // 无正式 keystore 时用 debug 签名，保证 CI 产物可直接安装验证
-            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            // 只允许正式密钥给 release 签名：没有密钥就产出未签名 APK，
+            // 由 CI 的 "Require release keystore" 步骤强制拦截。
+            // 这样"用 debug 密钥冒充正式发布版本"在结构上不再可能发生。
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
 
         debug {

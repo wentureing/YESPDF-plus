@@ -19,6 +19,24 @@ A PDF reader for Android —— 基于 [YESPDF](https://github.com/aaronzzx/YESP
   条目带中文用途注释（封面按书名匹配）、支持查看 / 重命名 / 复制路径 / 多选复制粘贴 / 导出 / 删除，
   数据库删除为高危流程（确认后立即退出，下次启动重建空库）
 
+## 签名与校验
+
+- 自 `v2.3.13` 起使用**固定正式密钥**签名（此前版本为 debug 签名，两者不能互相覆盖）：
+  从旧版本升级需先卸载旧包，否则会提示"应用未安装"。
+- 证书 SHA-256 指纹（可用于核对下载的 APK 是否出自本项目）：
+
+```
+DC:D4:C8:09:D5:9C:31:43:63:79:23:02:97:29:85:32:EA:CE:CD:3C:5F:29:6F:34:DF:A3:AD:F1:A6:7A:85:66
+```
+
+- 每个 Release 的说明里同时给出该次构建的**证书指纹**与 **APK SHA-256**。
+- 校验方式（需 Android SDK build-tools）：
+
+```bash
+apksigner verify --print-certs YESPDF-plus-*.apk
+sha256sum YESPDF-plus-*.apk
+```
+
 ## 工程约定
 
 - 构建：Gradle 5.4.1 + AGP 3.4.1 + JDK 8（CI 中先用 JDK 17 安装 SDK 包再切回 8）
