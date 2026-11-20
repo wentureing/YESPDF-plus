@@ -145,3 +145,42 @@ adb shell am start -n <pkg>/.main.MainActivity
 | `tools/craft_ab.py`（规划中） | 重签名 `.ab`：替换 manifest 签名行 + 重建 USTAR tar |
 
 > 所有脚本都是零第三方依赖（zlib/tarfile/sqlite3 标准库）。
+
+## 9. 成功条件核对表
+
+以本次 `yespdf-official-v2.2.5.ab`（155.5 MB，官方版 v2.2.5 / versionCode 34 / DB `user_version=4`）为例。
+
+### 9.1 能成功**导出**出可用 `.ab` 的条件（缺一即拿不到数据）
+
+| # | 条件 | 本次实测 | 不满足的症状 |
+|---|---|---|---|
+| 1 | 包的 manifest `allowBackup != false` | ✅ `flags=[... ALLOW_BACKUP]` | 备份出来只有空 manifest |
+| 2 | `targetSdk < 31`（Android 12 起对 31+ 限制 adb backup） | ✅ targetSdk 28 | 备份被跳过 |
+| 3 | **应用装在 adb 操作的当前用户空间**（机主 = User 0） | ✅ 当时在 User 0 运行 | `adb backup` 直接返回空/找不到包 |
+| 4 | 设备已解锁，并在手机上确认"备份我的数据" | ✅ | 命令一直卡在 `Now unlock your device...` |
+| 5 | 备份**不设密码** | ✅ 头部 `encrypt=none` | 需要 PC 端 AES-256/PBKDF2 解密才能读 |
+| 6 | 显式指定包名、不 `-all` | ✅ `-noapk -noshared com.aaron.yespdf` | 体积巨大且混入其他应用 |
+| 7 | 传输完整 | ✅ 三方 MD5 一致 | 解包 tar 报错 / DB `integrity_check` 失败 |
+| 8 | 压缩体是 **zlib deflate（`78 xx`）** | ✅ | 用错 gzip 解析会抛 `BadGzipFile (b'x\xda')` |
+
+> 条件 3 是本次差点忽略的一条：设备有 **User 0（机主）** 与 **User 10（访客）**，
+> 应用被装进访客空间时，`adb backup`（默认 User 0）拿不到任何数据；
+> 同理 `adb install` 也要留意装进了哪个用户（`dumpsys package` 看 `User N: installed=true`）。
+
+### 9.2 把 `.ab` 里的数据**落到新签名包并生效**的条件
+
+| # | 条件 | 本次实测 | 不满足的症状 |
+|---|---|---|---|
+| 1 | 包名一致 | ✅ 双方都是 `com.aaron.yespdf` | restore 直接忽略 |
+| 2 | **签名一致**（仅对 `adb restore` 路径） | ❌ 原开发者签名无法获得 | `Signature mismatch restoring ...`，命令却显示成功 |
+| 3 | 新包 `schemaVersion >= 备份的 user_version` | ✅ 已升到 4 | 打开即因数据库"降级"崩溃 |
+| 4 | 新包所需字段 ⊆ 备份字段 | ✅（备份多出 `CROP_RATIO`，多余列无害） | `no such column` |
+| 5 | **落位正确**：db→`databases/`、sp→`shared_prefs/`、封面→dataDir 根 | ⚠️ 曾两次落到 `files/db/` | 导入"成功"但书库为空 |
+| 6 | **重启应用**（`DataManager` 只在 `App.onCreate` 加载） | ⚠️ 容易漏 | 数据已在盘上但界面不更新 |
+| 7 | 原 PDF 文件仍在原位 | 需抽查 | 书能列出，点开空白 |
+| 8 | 密码密文可解（Keystore 密钥随安装/设备变化） | 本次不涉及（官方版无此功能） | 密文失效 → 应静默清除并重新询问 |
+| 9 | 走系统文件选择器时，MediaStore 已索引这些文件 | ❌ 初看是空目录 | 目录显示为空 → 需 `scan_volume` |
+
+**一句话**：`adb backup` 的 8 个条件决定"能不能拿到数据"，9.2 的 9 个条件决定"能不能用上数据"；
+本次失败点全在 9.2 的第 2、5、6、9 条，与数据完整性无关（三方哈希已证明）。
+
