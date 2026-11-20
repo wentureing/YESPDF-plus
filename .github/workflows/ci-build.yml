@@ -1,20 +1,17 @@
-name: Android CI
+name: CI Build
 
 on:
   push:
     branches: [ master, main, dev ]
     tags: [ 'v*' ]
-  pull_request:
   workflow_dispatch:
+  # 注意：本流水线只出包，不跑测试；测试见 ci-test.yml
 
-# 同一分支的新推送取消上一次运行，节省额度
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-build-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  # Gradle 5.4.1 + AGP 3.4.1 只能跑在 JDK 8 上
-  JAVA_VERSION: '8'
   GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dfile.encoding=UTF-8'
 
 jobs:
@@ -29,42 +26,33 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      # 缓存 ~/.gradle/caches、~/.gradle/wrapper，命中后二次构建可省数分钟
-      - name: Set up Gradle (with dependency cache)
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          cache-read-only: false
-
-      - name: Install Android SDK packages
-        uses: android-actions/setup-android@v3
-
-      - name: Ensure compileSdk / build-tools are installed
-        run: |
-          set -euo pipefail
-          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager"
-          fi
-          yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platforms;android-29" "build-tools;28.0.3" "platform-tools" || true
-          yes | "$SDKMANAGER" --licenses > /dev/null || true
-
-      # 额外缓存 AGP 的 build-cache 与已转换的依赖
-      - name: Cache Android build cache
+      # 缓存与 ci-test.yml 使用完全相同的 key，两条流水线互通
+      - name: Restore Gradle caches
         uses: actions/cache@v4
         with:
           path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
             ~/.android/build-cache
-            ~/.gradle/caches/transforms-2
-          key: android-build-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties') }}
+          key: gradle-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties', 'gradle.properties') }}
           restore-keys: |
-            android-build-cache-${{ runner.os }}-
+            gradle-cache-${{ runner.os }}-
+
+      # 先装 JDK 17：runner 自带的 cmdline-tools/sdkmanager 要求 JDK 17+
+      - name: Set up JDK 17 (for sdkmanager)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install required Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)"
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platforms;android-29" "build-tools;28.0.3" "platform-tools"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: Prepare optional release keystore
         env:
@@ -87,15 +75,22 @@ jobs:
             echo "no release keystore secret, fallback to debug signing"
           fi
 
+      # 再切回 JDK 8：Gradle 5.4.1 + AGP 3.4.1 只能跑在 JDK 8
+      - name: Set up JDK 8 (for Gradle)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # 版本号：基线 32 之后累加 run number，保证可覆盖安装
-      - name: Build debug + release
+      - name: Build debug + release (tests excluded)
         run: |
           set -euo pipefail
           ./gradlew :app:assembleDebug :app:assembleRelease \
             --no-daemon --stacktrace \
+            -x test -x testDebugUnitTest -x testReleaseUnitTest -x lint \
             -PBUILD_NUMBER=$((32 + GITHUB_RUN_NUMBER)) \
             -PVERSION_NAME=2.3.${GITHUB_RUN_NUMBER}
 

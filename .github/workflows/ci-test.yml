@@ -1,0 +1,82 @@
+name: CI Test
+
+on:
+  push:
+    branches: [ master, main, dev ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dfile.encoding=UTF-8'
+
+jobs:
+  unit-test:
+    name: Unit Test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # 缓存与 ci-build.yml 使用完全相同的 key，两条流水线互通
+      - name: Restore Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/build-cache
+          key: gradle-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties', 'gradle.properties') }}
+          restore-keys: |
+            gradle-cache-${{ runner.os }}-
+
+      # 先装 JDK 17：runner 自带的 cmdline-tools/sdkmanager 要求 JDK 17+
+      - name: Set up JDK 17 (for sdkmanager)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install required Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)"
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "platforms;android-29" "build-tools;28.0.3" "platform-tools"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      # 再切回 JDK 8：Gradle 5.4.1 + AGP 3.4.1 只能跑在 JDK 8
+      - name: Set up JDK 8 (for Gradle)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace \
+            -PBUILD_NUMBER=$((32 + GITHUB_RUN_NUMBER)) \
+            -PVERSION_NAME=2.3.${GITHUB_RUN_NUMBER}
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report-r${{ github.run_number }}
+          path: |
+            app/build/reports/tests/**
+            app/build/test-results/**
+          if-no-files-found: ignore
+          retention-days: 14
