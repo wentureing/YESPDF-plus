@@ -11,6 +11,10 @@ concurrency:
   group: ci-build-${{ github.ref }}
   cancel-in-progress: true
 
+# 需要写权限：构建成功后把最新 release APK 推到 release 分支
+permissions:
+  contents: write
+
 env:
   GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dfile.encoding=UTF-8'
 
@@ -125,6 +129,49 @@ jobs:
           path: out/*
           if-no-files-found: error
           retention-days: 30
+
+      # 把最新 release APK 放进仓库的 release 目录：
+      # 用独立的 release 分支承载（每次孤儿提交 + force push），
+      # 保证 master 历史干净、仓库里只保留"最新一份"产物。
+      - name: Publish latest release APK to release/ directory
+        if: github.event_name == 'push'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APK_PATH="$(ls out/*release*.apk | head -1 || true)"
+          if [ -z "${APK_PATH}" ]; then
+            echo "no release apk produced, skip"
+            exit 0
+          fi
+          APK_NAME="YESPDF-plus-2.3.${{ github.run_number }}-${GITHUB_SHA::7}-release.apk"
+          WORK="$(mktemp -d)"
+          cd "$WORK"
+          git init -q
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # 孤儿分支：release 分支永远只有一个提交，不累积历史
+          git checkout -q --orphan release
+          cp "${GITHUB_WORKSPACE}/${APK_PATH}" "./${APK_NAME}"
+          {
+            echo "# 最新构建产物"
+            echo
+            echo "| 项目 | 值 |"
+            echo "|---|---|"
+            echo "| 文件 | \`${APK_NAME}\` |"
+            echo "| 版本 | 2.3.${{ github.run_number }} |"
+            echo "| 提交 | \`${GITHUB_SHA::7}\` |"
+            echo "| 来源分支 | ${{ github.ref_name }} |"
+            echo "| 构建时间 (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo "| 构建记录 | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
+            echo
+            echo "> 本目录由 CI 自动维护，每次构建覆盖为最新一份。"
+          } > README.md
+          git add -f "./${APK_NAME}" README.md
+          git commit -q -m "release: ${APK_NAME} (run #${{ github.run_number }})"
+          git push -q -f origin release
+          echo "published ${APK_NAME} to release branch"
 
       - name: Publish GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')

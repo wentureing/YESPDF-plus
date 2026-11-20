@@ -30,6 +30,7 @@ import com.aaron.yespdf.common.event.ImportEvent
 import com.aaron.yespdf.common.utils.Base64
 import com.aaron.yespdf.common.widgets.ImageTextView
 import com.aaron.yespdf.filepicker.SelectActivity
+import com.aaron.yespdf.data.DataManagerActivity
 import com.aaron.yespdf.settings.SettingsActivity
 import com.blankj.utilcode.constant.PermissionConstants
 import com.blankj.utilcode.util.*
@@ -60,6 +61,7 @@ class MainActivity : CommonActivity(), IMainView {
         val tvImport = pwView.findViewById<TextView>(R.id.app_tv_import)
         val tvBackup = pwView.findViewById<TextView>(R.id.app_tv_backup)
         val tvSettings = pwView.findViewById<TextView>(R.id.app_tv_settings)
+        val tvManage = pwView.findViewById<TextView>(R.id.app_tv_manage)
         val tvAbout = pwView.findViewById<TextView>(R.id.app_tv_about)
         PopupWindow(pwView).apply {
             tvImport.setOnClickListener {
@@ -92,6 +94,10 @@ class MainActivity : CommonActivity(), IMainView {
             }
             tvSettings.setOnClickListener {
                 SettingsActivity.start(this@MainActivity)
+                dismiss()
+            }
+            tvManage.setOnClickListener {
+                DataManagerActivity.start(this@MainActivity)
                 dismiss()
             }
             tvAbout.setOnClickListener {

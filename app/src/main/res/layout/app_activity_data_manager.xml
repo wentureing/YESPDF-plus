@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用数据管理页：骨架同 SettingsActivity（toolbar + 列表），多一条概览与多选操作栏 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2F2F2"
+    tools:context=".data.DataManagerActivity">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/app_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/base_white"
+        style="@style/AppToolbarStyle"/>
+
+    <TextView
+        android:id="@+id/app_tv_overview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="@color/base_white"
+        android:textSize="@dimen/base_text_small"
+        android:textColor="@color/base_black_shallow"
+        tools:text="总占用 24.6 MB · 137 个文件 · 已存密码 2 条"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        android:background="@color/base_black_divider_shallow" />
+
+    <TextView
+        android:id="@+id/app_tv_path"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:background="?selectableItemBackground"
+        android:textSize="@dimen/base_text_small"
+        android:textColor="@color/base_black"
+        android:maxLines="1"
+        android:ellipsize="middle"
+        tools:text="files/" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/app_rv_data"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="vertical"/>
+
+    <LinearLayout
+        android:id="@+id/app_ll_selection"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:background="@color/base_white">
+
+        <Button
+            android:id="@+id/app_btn_copy"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:textSize="@dimen/base_text_large"
+            android:textColor="@color/base_black"
+            android:text="@string/app_data_copy" />
+
+        <Button
+            android:id="@+id/app_btn_export"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:textSize="@dimen/base_text_large"
+            android:textColor="@color/base_black"
+            android:text="@string/app_data_export" />
+
+        <Button
+            android:id="@+id/app_btn_delete_selected"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:textSize="@dimen/base_text_large"
+            android:textColor="@color/app_color_accent"
+            android:text="@string/app_delete" />
+
+        <Button
+            android:id="@+id/app_btn_cancel_selection"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:textSize="@dimen/base_text_large"
+            android:textColor="@color/base_black_hint"
+            android:text="@string/app_cancel" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/app_btn_paste"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/base_white"
+        android:textSize="@dimen/base_text_large"
+        android:textColor="@color/app_color_accent"
+        android:text="@string/app_data_paste"
+        android:visibility="gone" />
+
+</LinearLayout>

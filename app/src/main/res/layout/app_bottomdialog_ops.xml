@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  条目操作菜单：白底圆角 BottomSheet，结构与 app_bottomdialog_delete.xml 一致；
+  操作行由代码动态填充（复用 pw_main 的行样式：16dp padding + 可选背景 + 加粗）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/app_shape_round_rect_white">
+
+    <TextView
+        android:id="@+id/app_tv_ops_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="24dp"
+        android:textStyle="bold"
+        android:textColor="@color/base_black"
+        android:textSize="@dimen/base_text_xxhlarge"
+        tools:text="yespdf.db" />
+
+    <TextView
+        android:id="@+id/app_tv_ops_note"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="8dp"
+        android:textSize="@dimen/base_text_small"
+        android:textColor="@color/base_black_shallow"
+        android:lineSpacingExtra="3dp"
+        tools:text="书库数据库：书名·路径·进度·书签·分组" />
+
+    <LinearLayout
+        android:id="@+id/app_ll_ops"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.7dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/base_black_divider_shallow" />
+
+    <Button
+        android:id="@+id/app_btn_cancel"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@null"
+        android:textSize="@dimen/base_text_large"
+        android:textColor="@color/base_black_hint"
+        android:text="@string/app_cancel" />
+
+</LinearLayout>

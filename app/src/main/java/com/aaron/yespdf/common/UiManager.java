@@ -96,5 +96,12 @@ public final class UiManager {
         tv.setText(res);
     }
 
+    public static void showCenterShort(CharSequence text) {
+        ToastUtils.setGravity(Gravity.CENTER, 0, 0);
+        View toastView = ToastUtils.showCustomShort(R.layout.app_toast);
+        TextView tv = toastView.findViewById(R.id.app_tv);
+        tv.setText(text);
+    }
+
     private UiManager() {}
 }
