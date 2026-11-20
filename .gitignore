@@ -1,6 +1,7 @@
 # ---- 本项目新增（升级 / CI 相关） ----
 # 密钥与凭据（GitHub PAT、签名口令等），永不入库
 .secrets/
+backup/
 # 本地依赖探测脚本与产物
 .tools/
 *.aar
