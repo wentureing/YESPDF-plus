@@ -5,21 +5,23 @@ buildscript {
     ext.kotlin_version = '1.3.61'
     repositories {
         google()
-        jcenter()
-        maven { url 'https://dl.bintray.com/umsdk/release' }
+        // jcenter 已于 2021 年停服。本项目仍依赖仅存在于 jcenter 的构件
+        // （com.aaron:base、parallaxbacklayout、realtimeblurview、atv 等），
+        // 实测 Maven Central 全部 404，阿里云 jcenter 镜像可用，故置于首位。
+        maven { url 'https://maven.aliyun.com/repository/jcenter' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        mavenCentral()
+        maven { url "https://jitpack.io" }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.4.1'
         classpath 'com.jakewharton:butterknife-gradle-plugin:10.1.0'
         classpath 'org.greenrobot:greendao-gradle-plugin:3.2.2'
-
-        // pdfview
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
-        classpath 'com.github.dcendents:android-maven-gradle-plugin:2.1'
-
-//        classpath 'com.tencent.bugly:tinker-support:1.1.5'
-//        classpath 'com.tencent.bugly:symtabfileuploader:2.2.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+
+        // 已移除 bintray / android-maven 插件：jcenter+bintray 停服，且
+        // android-pdf-viewer/bintray.gradle 会强制读取 local.properties 导致 CI 配置阶段失败。
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -29,9 +31,11 @@ buildscript {
 allprojects {
     repositories {
         google()
-        jcenter()
+        maven { url 'https://maven.aliyun.com/repository/jcenter' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        mavenCentral()
         maven { url "https://jitpack.io" }
-        maven { url 'https://dl.bintray.com/umsdk/release' }
     }
 }
 

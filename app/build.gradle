@@ -13,6 +13,24 @@ apply plugin: 'org.greenrobot.greendao'
 //    appKey = 'a4ad086c-1c43-4dcf-92eb-ee0454f4988d' // 注册时分配的App Key
 //}
 
+// ---- 签名凭据读取：CI 环境变量 > local.properties > 回退 debug 签名 ----
+// 原实现在 configuration 阶段无条件读取 local.properties，CI 无该文件会直接失败。
+def signingProps = new Properties()
+def localPropsFile = project.rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { signingProps.load(it) }
+}
+def ksStore = System.getenv('STORE_FILE_NAME') ?: signingProps.getProperty('STORE_FILE_NAME')
+def ksStorePwd = System.getenv('KEYSTORE_PASSWORD') ?: signingProps.getProperty('KEYSTORE_PASSWORD')
+def ksAlias = System.getenv('STORE_ALIAS') ?: signingProps.getProperty('STORE_ALIAS')
+def ksKeyPwd = System.getenv('KEY_PASSWORD') ?: signingProps.getProperty('KEY_PASSWORD')
+boolean hasReleaseKeystore = ksStore != null && new File(ksStore).exists() && ksStorePwd != null
+
+// ---- 版本号：CI 通过 -PBUILD_NUMBER 注入，本地保持上游基线 32 / 2.2.3 ----
+def ciBuildNumber = (project.findProperty('BUILD_NUMBER') ?: System.getenv('BUILD_NUMBER'))
+def vCode = (ciBuildNumber != null && ciBuildNumber.toString().isInteger()) ? ciBuildNumber.toString().toInteger() : 32
+def vName = project.findProperty('VERSION_NAME') ?: "2.2.3"
+
 android {
     compileSdkVersion 29
 
@@ -21,8 +39,8 @@ android {
         applicationId "com.aaron.yespdf"
         minSdkVersion 21
         targetSdkVersion 28
-        versionCode 32
-        versionName "2.2.3"
+        versionCode vCode
+        versionName vName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
 
@@ -34,14 +52,13 @@ android {
     }
 
     signingConfigs {
-        Properties properties = new Properties()
-        InputStream inputStream = project.rootProject.file('local.properties').newDataInputStream()
-        properties.load(inputStream)
-        release {
-            storeFile file(properties.getProperty("STORE_FILE_NAME"))
-            storePassword properties.getProperty("KEYSTORE_PASSWORD")
-            keyAlias properties.getProperty("STORE_ALIAS")
-            keyPassword properties.getProperty("KEY_PASSWORD")
+        if (hasReleaseKeystore) {
+            release {
+                storeFile file(ksStore)
+                storePassword ksStorePwd
+                keyAlias ksAlias
+                keyPassword ksKeyPwd
+            }
         }
     }
 
@@ -58,7 +75,8 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            // 无正式 keystore 时用 debug 签名，保证 CI 产物可直接安装验证
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
 
         debug {
@@ -69,7 +87,7 @@ android {
             ]
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 

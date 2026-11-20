@@ -1,0 +1,125 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ master, main, dev ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新推送取消上一次运行，节省额度
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Gradle 5.4.1 + AGP 3.4.1 只能跑在 JDK 8 上
+  JAVA_VERSION: '8'
+  GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dfile.encoding=UTF-8'
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # 缓存 ~/.gradle/caches、~/.gradle/wrapper，命中后二次构建可省数分钟
+      - name: Set up Gradle (with dependency cache)
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: false
+
+      - name: Install Android SDK packages
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure compileSdk / build-tools are installed
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager"
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-29" "build-tools;28.0.3" "platform-tools" || true
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+
+      # 额外缓存 AGP 的 build-cache 与已转换的依赖
+      - name: Cache Android build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/build-cache
+            ~/.gradle/caches/transforms-2
+          key: android-build-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties') }}
+          restore-keys: |
+            android-build-cache-${{ runner.os }}-
+
+      - name: Prepare optional release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          STORE_ALIAS: ${{ secrets.STORE_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_B64:-}" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
+            {
+              echo "STORE_FILE_NAME=$GITHUB_WORKSPACE/release.jks"
+              echo "STORE_ALIAS=$STORE_ALIAS"
+              echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "KEY_PASSWORD=$KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "release keystore ready"
+          else
+            echo "no release keystore secret, fallback to debug signing"
+          fi
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # 版本号：基线 32 之后累加 run number，保证可覆盖安装
+      - name: Build debug + release
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleDebug :app:assembleRelease \
+            --no-daemon --stacktrace \
+            -PBUILD_NUMBER=$((32 + GITHUB_RUN_NUMBER)) \
+            -PVERSION_NAME=2.3.${GITHUB_RUN_NUMBER}
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          find app/build/outputs/apk -name '*.apk' -print -exec cp {} out/ \;
+          if [ -f app/build/outputs/mapping/release/mapping.txt ]; then
+            cp app/build/outputs/mapping/release/mapping.txt out/mapping-release.txt
+          fi
+          ls -lh out
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: yespdf-apk-r${{ github.run_number }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
