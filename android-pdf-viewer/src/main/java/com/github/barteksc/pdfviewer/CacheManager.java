@@ -15,11 +15,13 @@
  */
 package com.github.barteksc.pdfviewer;
 
+import android.graphics.Bitmap;
 import android.graphics.RectF;
 
 import androidx.annotation.Nullable;
 
 import com.github.barteksc.pdfviewer.model.PagePart;
+import com.github.barteksc.pdfviewer.util.Constants;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,6 +32,13 @@ import java.util.PriorityQueue;
 import static com.github.barteksc.pdfviewer.util.Constants.Cache.CACHE_SIZE;
 import static com.github.barteksc.pdfviewer.util.Constants.Cache.THUMBNAILS_CACHE_SIZE;
 
+/**
+ * 位图瓦片缓存。
+ *
+ * 与上游的差异：淘汰策略从"只按数量"改为 **数量 + 字节预算** 双限。
+ * 上游单片位图的实际尺寸随缩放级别变化（约等于整页像素），
+ * 120 片的数量上限在大页面上意味着上百 MB，滚动到文档后段时极易 OOM。
+ */
 class CacheManager {
 
     private final PriorityQueue<PagePart> passiveCache;
@@ -42,19 +51,25 @@ class CacheManager {
 
     private final PagePartComparator orderComparator = new PagePartComparator();
 
+    /** 当前 active + passive 的位图总字节数 */
+    private long cachedBytes = 0;
+
     public CacheManager() {
         activeCache = new PriorityQueue<>(CACHE_SIZE, orderComparator);
         passiveCache = new PriorityQueue<>(CACHE_SIZE, orderComparator);
         thumbnails = new ArrayList<>();
+        if (Constants.Cache.CACHE_BYTES_LIMIT <= 0) {
+            // 兜底：保持旧的等效预算（120 片 × 256×256×4B ≈ 30MB）
+            Constants.Cache.CACHE_BYTES_LIMIT = (long) CACHE_SIZE * 256L * 256L * 4L;
+        }
     }
 
     public void cachePart(PagePart part) {
         synchronized (passiveActiveLock) {
-            // If cache too big, remove and recycle
-            makeAFreeSpace();
-
-            // Then add part
+            long incoming = sizeOf(part);
+            makeAFreeSpace(incoming);
             activeCache.offer(part);
+            cachedBytes += incoming;
         }
     }
 
@@ -65,17 +80,37 @@ class CacheManager {
         }
     }
 
-    private void makeAFreeSpace() {
+    private void makeAFreeSpace(long incoming) {
         synchronized (passiveActiveLock) {
-            while ((activeCache.size() + passiveCache.size()) >= CACHE_SIZE &&
-                    !passiveCache.isEmpty()) {
+            long limit = Constants.Cache.CACHE_BYTES_LIMIT;
+
+            // 1) 先按字节预算淘汰：passive 里的瓦片离当前视口最远，优先释放
+            while (cachedBytes + incoming > limit && !passiveCache.isEmpty()) {
                 PagePart part = passiveCache.poll();
-                part.getRenderedBitmap().recycle();
+                cachedBytes -= sizeOf(part);
+                recycleQuietly(part);
+            }
+            while (cachedBytes + incoming > limit && !activeCache.isEmpty()) {
+                PagePart part = activeCache.poll();
+                cachedBytes -= sizeOf(part);
+                recycleQuietly(part);
             }
 
-            while ((activeCache.size() + passiveCache.size()) >= CACHE_SIZE &&
-                    !activeCache.isEmpty()) {
-                activeCache.poll().getRenderedBitmap().recycle();
+            // 2) 再保留数量上限，避免大量小瓦片把队列撑爆
+            while ((activeCache.size() + passiveCache.size()) >= CACHE_SIZE
+                    && !passiveCache.isEmpty()) {
+                PagePart part = passiveCache.poll();
+                cachedBytes -= sizeOf(part);
+                recycleQuietly(part);
+            }
+            while ((activeCache.size() + passiveCache.size()) >= CACHE_SIZE
+                    && !activeCache.isEmpty()) {
+                PagePart part = activeCache.poll();
+                cachedBytes -= sizeOf(part);
+                recycleQuietly(part);
+            }
+            if (cachedBytes < 0) {
+                cachedBytes = 0;
             }
         }
     }
@@ -84,7 +119,7 @@ class CacheManager {
         synchronized (thumbnails) {
             // If cache too big, remove and recycle
             while (thumbnails.size() >= THUMBNAILS_CACHE_SIZE) {
-                thumbnails.remove(0).getRenderedBitmap().recycle();
+                recycleQuietly(thumbnails.remove(0));
             }
 
             // Then add thumbnail
@@ -130,7 +165,7 @@ class CacheManager {
     private void addWithoutDuplicates(Collection<PagePart> collection, PagePart newPart) {
         for (PagePart part : collection) {
             if (part.equals(newPart)) {
-                newPart.getRenderedBitmap().recycle();
+                recycleQuietly(newPart);
                 return;
             }
         }
@@ -164,19 +199,32 @@ class CacheManager {
     public void recycle() {
         synchronized (passiveActiveLock) {
             for (PagePart part : passiveCache) {
-                part.getRenderedBitmap().recycle();
+                recycleQuietly(part);
             }
             passiveCache.clear();
             for (PagePart part : activeCache) {
-                part.getRenderedBitmap().recycle();
+                recycleQuietly(part);
             }
             activeCache.clear();
+            cachedBytes = 0;
         }
         synchronized (thumbnails) {
             for (PagePart part : thumbnails) {
-                part.getRenderedBitmap().recycle();
+                recycleQuietly(part);
             }
             thumbnails.clear();
+        }
+    }
+
+    private static long sizeOf(PagePart part) {
+        Bitmap bitmap = part.getRenderedBitmap();
+        return bitmap == null ? 0L : bitmap.getByteCount();
+    }
+
+    private static void recycleQuietly(PagePart part) {
+        Bitmap bitmap = part.getRenderedBitmap();
+        if (bitmap != null && !bitmap.isRecycled()) {
+            bitmap.recycle();
         }
     }
 

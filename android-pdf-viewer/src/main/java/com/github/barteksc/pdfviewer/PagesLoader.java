@@ -109,8 +109,9 @@ class PagesLoader {
     private void calculatePartSize(GridSize grid) {
         pageRelativePartWidth = 1f / (float) grid.cols;
         pageRelativePartHeight = 1f / (float) grid.rows;
-        partRenderWidth = Constants.PART_SIZE / pageRelativePartWidth;
-        partRenderHeight = Constants.PART_SIZE / pageRelativePartHeight;
+        // 与 RenderingHandler 的单片上限保持一致：超出则按上限渲染（视觉上略糊，但不会 OOM）
+        partRenderWidth = Math.min(Constants.MAX_PART_RENDER, Constants.PART_SIZE / pageRelativePartWidth);
+        partRenderHeight = Math.min(Constants.MAX_PART_RENDER, Constants.PART_SIZE / pageRelativePartHeight);
     }
 
 

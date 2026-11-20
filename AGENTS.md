@@ -4,9 +4,11 @@
 
 ## 一、协作与节奏
 
-- **优先级：功能优先，故障修复挂起**（用户 2026-11-20 指示）。当前执行序列见 `docs/PLAN.md` §0.0：
-  F1 夜间显示拆分 → F2 加密 PDF → F3 扫描/浏览规则 → F4 用户数据可见。
-  内存治理、畸形 PDF 容错、`PdfUtils` fd 泄漏、pdfium 内核升级**暂不动**，除非用户改口。
+- **当前进度**（用户 2026-11-20/21 指示，详见 `docs/PLAN.md` §0.0）：
+  已完成 —— F0 应用数据管理、F1 夜间显示拆分（含蒙版强度）、F2 加密 PDF、F5/F6 扫描与浏览规则；
+  进行中 —— M2 内存治理（预算制缓存 / 单片上限 / trimMemory / PdfUtils fd 修复，均为**不换依赖**的纯优化）；
+  仍挂起 —— pdfium 内核升级（io.legere:pdfiumandroid）、PdfBox 密码预检（需评估依赖体积与 ABI）、畸形 PDF 容错。
+  换依赖必须"更好或等价"，且先在 CI 编译验证。
 - **不要轮询**：任何人（含 AI 助手）默认**不主动轮询** CI 运行状态、远端仓库状态、日志，除非用户当轮明确要求。提交/推送后说明"已触发"即可，等用户反馈结果。
 - **计划优先**：功能改动先落 `docs/PLAN.md` 里程碑，再动代码；每个里程碑独立 PR / 提交组。
 - **不本地编译**：本机不安装 Android SDK / Gradle，一切构建与验证走 GitHub Actions。禁止建议"你本地跑一下 gradle"。
@@ -24,6 +26,13 @@
   - 分支入口：`release` 分支由 CI 独占，每次孤儿提交 + `force push` 覆盖。
   - 上述两种覆盖属既定行为，无需额外确认；其他分支的 force push 仍必须先确认。
   - 不再为 `v*` tag 单独创建 Release（会产生多版本堆积）。
+
+- **架构静态检查**：`.github/scripts/arch_check.py` 在 `ci-test` 中运行（零依赖），检查三件事：
+  1) 包依赖方向（L0 `common` ← L1 `data/filepicker/settings/about` ← L2 `main/preview`，禁止 `data↔filepicker`、`preview→main`；
+     历史例外登记在 `WAIVERS`，只报告不阻断）
+  2) 数量阈值（单文件 ≤1800 行、单目录 ≤25 个源文件）
+  3) 块注释安全（KDoc 被 `*/` 提前闭合会直接导致 Kotlin 语法错误）
+  违反即红，需要改代码而不是放宽阈值。
 
 - 两者**缓存必须互通**：统一使用同一个 `actions/cache` key
   （`gradle-cache-<os>-<hashFiles(**/*.gradle, gradle-wrapper.properties, gradle.properties)>`，`restore-keys` 前缀相同），

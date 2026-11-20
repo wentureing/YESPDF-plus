@@ -17,7 +17,7 @@ import java.io.FileOutputStream
  * （当前依赖树里也没有它），手写 40 行即可完全替代。
  *
  * 关键约定：
- * - 选**文件**用 `ACTION_OPEN_DOCUMENT` + `type="*/*"`，**绝不设 `EXTRA_MIME_TYPES`**
+ * - 选**文件**用 `ACTION_OPEN_DOCUMENT` + 通配符 type，**绝不设 `EXTRA_MIME_TYPES`**
  *   （一旦按类型过滤，系统侧边栏会被裁剪，只剩"最近/下载"这类入口）
  * - 选**文件夹**只能 `ACTION_OPEN_DOCUMENT_TREE`，此时侧边栏只列出支持 createDocument 的根
  * - Android 11+ 不允许选 Download 根 / 存储根 / Android/data，需引导用户选子目录

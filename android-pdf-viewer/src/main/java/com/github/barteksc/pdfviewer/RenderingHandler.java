@@ -27,6 +27,7 @@ import android.util.Log;
 
 import com.github.barteksc.pdfviewer.exception.PageRenderingException;
 import com.github.barteksc.pdfviewer.model.PagePart;
+import com.github.barteksc.pdfviewer.util.Constants;
 
 /**
  * A {@link Handler} that will process incoming {@link RenderingTask} messages
@@ -93,6 +94,15 @@ class RenderingHandler extends Handler {
         int w = Math.round(renderingTask.width);
         int h = Math.round(renderingTask.height);
 
+        // 单片像素上限：极端缩放下瓦片尺寸会逼近整页像素，这里先降采样
+        int maxSide = Constants.MAX_PART_RENDER;
+        if (w > maxSide || h > maxSide) {
+            float scale = Math.min((float) maxSide / (float) w, (float) maxSide / (float) h);
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+            renderingTask.bestQuality = false;
+        }
+
         if (w == 0 || h == 0 || pdfFile.pageHasError(renderingTask.page)) {
             return null;
         }
@@ -100,6 +110,16 @@ class RenderingHandler extends Handler {
         Bitmap render;
         try {
             render = Bitmap.createBitmap(w, h, renderingTask.bestQuality ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565);
+        } catch (OutOfMemoryError oom) {
+            // 内存不足：释放缓存后放弃这一片，滚动时会重新请求
+            Log.e(TAG, "OOM while creating bitmap " + w + "x" + h, oom);
+            pdfView.post(new Runnable() {
+                @Override
+                public void run() {
+                    pdfView.trimMemory();
+                }
+            });
+            return null;
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Cannot create bitmap", e);
             return null;

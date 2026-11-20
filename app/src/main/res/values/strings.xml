@@ -57,6 +57,7 @@
     <string name="app_night_invert_desc">Negative colors, best for pure black-and-white text</string>
     <string name="app_night_mask">Mask</string>
     <string name="app_night_mask_desc">Keeps original colors, only lowers brightness</string>
+    <string name="app_night_mask_strength">Mask strength</string>
     <string name="app_night_long_press_tip">Long press the night button to switch between Invert and Mask</string>
     <string name="app_notice">Attention！</string>
     <string name="app_whether_delete_recent">This operation will delete %d recent reading records (without clearing the reading progress). Do you want to continue?</string>

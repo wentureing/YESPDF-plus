@@ -97,15 +97,21 @@ object DialogManager {
 
     /**
      * 夜间显示模式二选一：反色（黑白文档）/ 蒙版（彩色文档）。
-     * 视觉沿用现有的白底 BottomSheet，不引入新样式。
+     * 选中蒙版时下方出现强度调节（10%~90%），拖动即时生效。
      */
-    fun createNightModeDialog(context: Context, current: Int, callback: (Int, BottomSheetDialog) -> Unit): BottomSheetDialog {
+    fun createNightModeDialog(context: Context,
+                              current: Int,
+                              onMaskAlphaChanged: (Int) -> Unit,
+                              callback: (Int, BottomSheetDialog) -> Unit): BottomSheetDialog {
         val view = LayoutInflater.from(context.applicationContext)
                 .inflate(R.layout.app_bottomdialog_night_mode, null)
         val llInvert = view.findViewById<View>(R.id.app_ll_invert)
         val llMask = view.findViewById<View>(R.id.app_ll_mask)
         val ivInvert = view.findViewById<ImageView>(R.id.app_iv_invert_check)
         val ivMask = view.findViewById<ImageView>(R.id.app_iv_mask_check)
+        val llStrength = view.findViewById<View>(R.id.app_ll_mask_strength)
+        val sbAlpha = view.findViewById<SeekBar>(R.id.app_sb_mask_alpha)
+        val tvAlpha = view.findViewById<TextView>(R.id.app_tv_mask_alpha)
         val btnCancel = view.findViewById<Button>(R.id.app_btn_cancel)
         val dialog = DialogUtils.createBottomSheetDialog(context, view)
 
@@ -116,7 +122,23 @@ object DialogManager {
             ivMask.setImageResource(
                     if (checked == Settings.NIGHT_DISPLAY_MASK) R.drawable.app_ic_check_circle_red_24dp
                     else R.drawable.app_ic_unchecked_grey_24dp)
+            llStrength.visibility =
+                    if (checked == Settings.NIGHT_DISPLAY_MASK) View.VISIBLE else View.GONE
         }
+
+        sbAlpha.progress = (Settings.nightMaskAlpha - 10).coerceIn(0, 80)
+        tvAlpha.text = "${Settings.nightMaskAlpha}%"
+        sbAlpha.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val alpha = progress + 10
+                tvAlpha.text = "$alpha%"
+                onMaskAlphaChanged(alpha)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         render(current)
         llInvert.setOnClickListener {

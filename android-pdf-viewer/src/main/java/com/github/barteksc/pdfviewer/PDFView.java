@@ -15,6 +15,7 @@
  */
 package com.github.barteksc.pdfviewer;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -258,6 +259,7 @@ public class PDFView extends RelativeLayout {
             return;
         }
 
+        initRenderGlobals(context);
         cacheManager = new CacheManager();
         animationManager = new AnimationManager(this);
         dragPinchManager = new DragPinchManager(this, animationManager);
@@ -453,6 +455,44 @@ public class PDFView extends RelativeLayout {
         recycled = true;
         callbacks = new Callbacks();
         state = State.DEFAULT;
+    }
+
+    /**
+     * 系统内存吃紧时主动释放全部位图瓦片（当前屏会重新渲染一次）。
+     * 由宿主 Activity 在 onTrimMemory 中调用。
+     */
+    public void trimMemory() {
+        if (cacheManager != null) {
+            cacheManager.recycle();
+        }
+        redraw();
+    }
+
+    /**
+     * 初始化与内存预算相关的全局参数（进程内只生效一次）。
+     *
+     * - CACHE_BYTES_LIMIT：按堆的 1/8 估算，限制在 24MB~96MB
+     * - PART_SIZE：按屏幕短边推算，限制在 256~512，避免"一片=整页"
+     */
+    private static void initRenderGlobals(Context context) {
+        try {
+            if (Constants.Cache.CACHE_BYTES_LIMIT <= 0) {
+                ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                int memoryClass = (am != null) ? am.getMemoryClass() : 128;
+                long budget = (long) memoryClass * 1024L * 1024L / 8L;
+                budget = Math.max(24L * 1024L * 1024L, Math.min(budget, 96L * 1024L * 1024L));
+                Constants.Cache.CACHE_BYTES_LIMIT = budget;
+            }
+            if (Constants.PART_SIZE <= 256f) {
+                int shortSide = Math.min(
+                        context.getResources().getDisplayMetrics().widthPixels,
+                        context.getResources().getDisplayMetrics().heightPixels);
+                float part = shortSide * 0.35f;
+                Constants.PART_SIZE = Math.max(256f, Math.min(512f, part));
+            }
+        } catch (Throwable ignored) {
+            // 任何异常都退回默认值，不影响渲染
+        }
     }
 
     public boolean isRecycled() {

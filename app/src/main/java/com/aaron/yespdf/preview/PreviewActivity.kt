@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -293,6 +294,18 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
         super.onDestroy()
         EventBus.getDefault().unregister(this)
         app_pdfview.recycle()
+    }
+
+    /**
+     * 系统内存吃紧时主动释放渲染缓存。
+     * 大文件快速滚动的主要崩溃场景就是位图缓存 + 渲染队列吃满堆，
+     * 这里在系统发出低内存信号时立刻清空瓦片缓存（当前屏会重绘一次）。
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            app_pdfview.trimMemory()
+        }
     }
     //endregion
 
@@ -844,10 +857,18 @@ class PreviewActivity : CommonActivity(), IActivityInterface, View.OnClickListen
             }
         }
         nightModeBtn.setOnLongClickListener {
-            DialogManager.createNightModeDialog(this, Settings.nightDisplay) { mode, dialog ->
-                dialog.dismiss()
-                nightDisplay.value = mode
-            }.show()
+            DialogManager.createNightModeDialog(
+                    this,
+                    Settings.nightDisplay,
+                    onMaskAlphaChanged = { alpha ->
+                        Settings.nightMaskAlpha = alpha
+                        // 正在蒙版模式时拖动即时生效
+                        applyNightMask(Settings.nightDisplay)
+                    },
+                    callback = { mode, dialog ->
+                        dialog.dismiss()
+                        nightDisplay.value = mode
+                    }).show()
             true
         }
         sbScrollLevel.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {

@@ -55,6 +55,7 @@
     <string name="app_night_invert_desc">负片效果，适合纯黑白文字</string>
     <string name="app_night_mask">蒙版</string>
     <string name="app_night_mask_desc">保留原始配色，仅降低亮度</string>
+    <string name="app_night_mask_strength">蒙版强度</string>
     <string name="app_night_long_press_tip">长按此按钮可切换「反色 / 蒙版」</string>
     <string name="app_notice">注意！</string>
     <string name="app_whether_delete_recent">本次操作将会删除 %d 个最近阅读记录（不清除阅读进度），是否继续？</string>

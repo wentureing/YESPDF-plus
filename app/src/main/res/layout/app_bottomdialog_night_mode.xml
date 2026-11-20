@@ -145,6 +145,48 @@
             android:contentDescription="@string/app_night_mask" />
     </LinearLayout>
 
+    <!-- 蒙版强度：仅在选中"蒙版"时显示，10%~90% -->
+    <LinearLayout
+        android:id="@+id/app_ll_mask_strength"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="8dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="@dimen/base_text_small"
+            android:textColor="@color/base_black_shallow"
+            android:text="@string/app_night_mask_strength" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <SeekBar
+                android:id="@+id/app_sb_mask_alpha"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="80" />
+
+            <TextView
+                android:id="@+id/app_tv_mask_alpha"
+                android:layout_width="52dp"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:textSize="@dimen/base_text_large"
+                android:textColor="@color/base_black"
+                tools:text="65%" />
+        </LinearLayout>
+    </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="0.7dp"

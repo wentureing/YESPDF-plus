@@ -106,7 +106,7 @@ class DataManagerActivity : CommonActivity() {
     }
 
     /**
-     * 选文件：故意用 `*/*` 且**不设 EXTRA_MIME_TYPES**。
+     * 选文件：故意用通配符 type 且**不设 EXTRA_MIME_TYPES**。
      * 一旦按类型过滤，系统侧边栏会被裁剪成"可能含该类型"的少数入口，
      * 图片/视频/音频/下载/手机型号/第三方 App 目录都会消失。
      */

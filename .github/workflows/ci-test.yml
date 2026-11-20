@@ -74,6 +74,11 @@ jobs:
           distribution: temurin
           java-version: '8'
 
+      # 架构静态检查：依赖方向 / 文件与目录数量 / 块注释安全
+      # （零依赖，Ubuntu runner 自带 python3）
+      - name: Architecture & size check
+        run: python3 .github/scripts/arch_check.py
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
