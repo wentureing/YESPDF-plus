@@ -143,6 +143,8 @@
     <string name="app_data_select_first">请先长按选择要导出的条目</string>
     <string name="app_data_importing">正在导入…</string>
     <string name="app_data_imported">已导入 %1$d 项</string>
+    <string name="app_data_import_nested">数据库被放进了子目录 %1$s/，需要放到 databases 根目录：长按该文件 → 复制 → 进入 databases → 粘贴</string>
+    <string name="app_data_imported_not_found">已导入 %1$d 项，但未发现 yespdf.db</string>
     <string name="app_data_exported_count">已导出 %1$d 项</string>
     <string name="app_data_replace_image">替换图片（自动压到 ≤512px / ≤2MB）</string>
     <string name="app_data_image_replaced">图片已替换</string>

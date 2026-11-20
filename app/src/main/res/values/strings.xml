@@ -145,6 +145,8 @@
     <string name="app_data_select_first">Long-press items to select first</string>
     <string name="app_data_importing">Importing…</string>
     <string name="app_data_imported">%1$d item(s) imported</string>
+    <string name="app_data_import_nested">The database landed in subfolder %1$s/. It must sit in databases/: long-press it → Copy → open databases → Paste</string>
+    <string name="app_data_imported_not_found">%1$d item(s) imported, but yespdf.db was not found</string>
     <string name="app_data_exported_count">%1$d item(s) exported</string>
     <string name="app_data_replace_image">Replace image (auto ≤512px / ≤2MB)</string>
     <string name="app_data_image_replaced">Image replaced</string>

@@ -95,7 +95,10 @@ object DocumentTreeHelper {
                             DocumentsContract.getDocumentId(entry.uri),
                             File(targetDir, uniqueName(targetDir, entry.name)))
                 } else {
-                    val dst = File(targetDir, uniqueName(targetDir, entry.name))
+                    // 文件按原名写入；同名则先备份再覆盖（否则会变成 "yespdf (1).db"，
+                    // 应用仍读旧文件，用户看到的是"导入成功但没有效果"）
+                    val dst = File(targetDir, entry.name)
+                    if (dst.exists()) InternalDataScanner.backupBeforeOverwrite(dst)
                     resolver.openInputStream(entry.uri)?.use { input ->
                         FileOutputStream(dst).use { output -> input.copyTo(output) }
                     }
@@ -112,7 +115,8 @@ object DocumentTreeHelper {
     fun copyDocumentToDir(resolver: ContentResolver, uri: Uri, name: String, targetDir: File): Boolean {
         return try {
             if (!targetDir.exists()) targetDir.mkdirs()
-            val dst = File(targetDir, uniqueName(targetDir, name))
+            val dst = File(targetDir, name)
+            if (dst.exists()) InternalDataScanner.backupBeforeOverwrite(dst)
             resolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(dst).use { output -> input.copyTo(output) }
             }

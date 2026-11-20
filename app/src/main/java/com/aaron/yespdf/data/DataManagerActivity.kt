@@ -197,11 +197,24 @@ class DataManagerActivity : CommonActivity() {
         UiManager.showShort(R.string.app_data_importing)
         Thread {
             val count = DocumentTreeHelper.copyTreeToDir(contentResolver, treeUri, target)
-            val touchedDb = File(target, AppConfig.DB_NAME).exists()
+            // 用户很容易选错层级（把包含 db/ sp/ 的备份根目录整棵导入），
+            // 所以这里主动检查三种情况，而不是只看 target 本身
+            val direct = File(target, AppConfig.DB_NAME).exists()
+            val nested = target.listFiles()?.firstOrNull { dir ->
+                dir.isDirectory && File(dir, AppConfig.DB_NAME).exists()
+            }
             runOnUiThread {
-                UiManager.showShort(getString(R.string.app_data_imported, count))
                 refresh()
-                if (touchedDb) promptRestartAfterDbImport()
+                when {
+                    direct -> {
+                        UiManager.showShort(getString(R.string.app_data_imported, count))
+                        promptRestartAfterDbImport()
+                    }
+                    nested != null -> UiManager.showCenterShort(
+                            getString(R.string.app_data_import_nested, nested.name))
+                    else -> UiManager.showShort(
+                            getString(R.string.app_data_imported_not_found, count))
+                }
             }
         }.start()
     }
@@ -617,9 +630,11 @@ class DataManagerActivity : CommonActivity() {
         val target = currentDir ?: return
         Thread {
             val count = InternalDataScanner.paste(target)
+            val touchedDb = File(target, AppConfig.DB_NAME).exists()
             runOnUiThread {
                 UiManager.showShort(getString(R.string.app_data_pasted, count))
                 refresh()
+                if (touchedDb) promptRestartAfterDbImport()
             }
         }.start()
     }

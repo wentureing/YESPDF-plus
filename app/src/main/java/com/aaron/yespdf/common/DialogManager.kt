@@ -43,6 +43,10 @@ object DialogManager {
         val view = LayoutInflater.from(context.applicationContext).inflate(R.layout.app_dialog_input, null)
         val tvTitle = view.findViewById<TextView>(R.id.app_tv_title)
         val etInput = view.findViewById<EditText>(R.id.app_et_input)
+        // app_dialog_input 布局原本是为密码场景写的（inputType=textPassword），
+        // 复用到重命名/规则输入时会出现"全是圆点"。这里显式改成普通文本，
+        // 密码场景走独立的 app_dialog_password（仍保持 textPassword）。
+        etInput.inputType = android.text.InputType.TYPE_CLASS_TEXT
         val btnCancel = view.findViewById<Button>(R.id.app_btn_cancel)
         val btnConfirm = view.findViewById<Button>(R.id.app_btn_confirm)
         callback(tvTitle, etInput, btnCancel, btnConfirm)

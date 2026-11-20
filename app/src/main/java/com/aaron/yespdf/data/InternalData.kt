@@ -283,13 +283,17 @@ object InternalDataScanner {
         var ok = 0
         for (src in sources) {
             if (!src.exists()) continue
-            val name = uniqueName(target, src.name)
-            val dst = File(target, name)
+            // 文件保持原名（同名则先备份旧文件再覆盖），否则会生成 "yespdf (1).db"
+            // 这类名字，应用读的还是旧文件，表现为"粘贴成功但没生效"。
+            // 目录仍用自动改名，避免两棵目录树被悄悄合并。
+            val dst = if (src.isDirectory) File(target, uniqueName(target, src.name))
+            else File(target, src.name)
             try {
                 if (src.isDirectory) {
                     src.copyRecursively(dst, overwrite = false)
                 } else {
-                    src.copyTo(dst, overwrite = false)
+                    if (dst.exists()) backupBeforeOverwrite(dst)
+                    src.copyTo(dst, overwrite = true)
                 }
                 if (AppClipboard.isMove) src.deleteRecursively()
                 ok++
@@ -299,6 +303,22 @@ object InternalDataScanner {
         }
         if (ok > 0) AppClipboard.clear()
         return ok
+    }
+
+    /**
+     * 覆盖同名文件前先留档：`yespdf.db` → `yespdf.db.bak-<时间戳>`。
+     * 这样"粘贴/导入覆盖"既能立刻生效，又能在出错时回滚（文件仍在本目录可见）。
+     */
+    fun backupBeforeOverwrite(dst: File) {
+        try {
+            if (!dst.exists()) return
+            val backup = File(dst.parentFile, dst.name + ".bak-" + System.currentTimeMillis())
+            if (!dst.renameTo(backup)) {
+                dst.delete()
+            }
+        } catch (t: Throwable) {
+            // 备份失败就让它走后面的覆盖逻辑
+        }
     }
 
     private fun uniqueName(dir: File, name: String): String {
