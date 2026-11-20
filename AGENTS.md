@@ -34,10 +34,13 @@
   3) 块注释安全（KDoc 被 `*/` 提前闭合会直接导致 Kotlin 语法错误）
   违反即红，需要改代码而不是放宽阈值。
 
-- 两者**缓存必须互通**：统一使用同一个 `actions/cache` key
-  （`gradle-cache-<os>-<hashFiles(**/*.gradle, gradle-wrapper.properties, gradle.properties)>`，`restore-keys` 前缀相同），
-  缓存路径固定为 `~/.gradle/caches`、`~/.gradle/wrapper`、`~/.android/build-cache`。
-  不要改用 `setup-gradle` 的自带缓存（其 key 含 workflow 文件名，两个流水线无法互通）。
+- 两者**缓存必须互通**：统一使用同一个**显式** key `gradle-cache-<os>-v1`（`restore-keys` 前缀相同），
+  缓存路径固定为 `~/.gradle/caches`、`~/.gradle/wrapper`。
+  - **禁止**再用 `hashFiles(...)` 生成 key：每次修改 `*.gradle` 都会产生一份新缓存（实测每份约 441MB），
+    而 GitHub 不会自动删除旧 key，很快吃满配额。
+  - 依赖有实质变更时，**手动**把两个 workflow 里的 `v1` 递增为 `v2`（否则新依赖每次都要重新下载）。
+  - **不要**缓存 `~/.android/build-cache`：命中率低且是体积大头。
+  - 不要改用 `setup-gradle` 的自带缓存（其 key 含 workflow 文件名，两条流水线无法互通）。
 - 工具链固定：**Gradle 5.4.1 + AGP 3.4.1 只能用 JDK 8**；而 `cmdline-tools` 的 `sdkmanager` 需要 JDK 17。
   因此统一做法：**先用 JDK 17 装 SDK 包，再切回 JDK 8 构建**。不要试图在 JDK 8 下跑 sdkmanager。
 - 版本号：`-PBUILD_NUMBER=$((32 + GITHUB_RUN_NUMBER))`、`-PVERSION_NAME=2.3.<run>`，保证可覆盖安装。

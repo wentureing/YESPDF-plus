@@ -25,15 +25,17 @@ jobs:
         with:
           fetch-depth: 1
 
-      # 缓存与 ci-build.yml 使用完全相同的 key，两条流水线互通
+      # 显式固定 key（不再用 hashFiles 自动计算）：
+      #   hashFiles 每次修改 *.gradle 都会生成新 key，旧缓存不会自动删除，
+      #   实测已累积 3 份 ~441MB（共 1.3GB）。依赖有实质变更时手动把 v1 递增为 v2。
+      #   只缓存依赖与 wrapper；~/.android/build-cache 命中率低且是体积大头，已移除。
       - name: Restore Gradle caches
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.android/build-cache
-          key: gradle-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties', 'gradle.properties') }}
+          key: gradle-cache-${{ runner.os }}-v1
           restore-keys: |
             gradle-cache-${{ runner.os }}-
 
