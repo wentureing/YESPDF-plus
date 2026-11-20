@@ -9,6 +9,7 @@ import androidx.multidex.MultiDex;
 
 import com.aaron.yespdf.common.greendao.DaoMaster;
 import com.aaron.yespdf.common.statistic.Statistic;
+import com.aaron.yespdf.common.utils.LegacyCleaner;
 import com.aaron.yespdf.common.utils.ShortcutUtils;
 import com.blankj.utilcode.util.SPStaticUtils;
 import com.github.anzewei.parallaxbacklayout.ParallaxHelper;
@@ -43,6 +44,8 @@ public class App extends Application {
         leakCanary();
         ShortcutUtils.INSTANCE.init(this);
         DBHelper.init(this, AppConfig.DB_NAME);
+        // 移除友盟 SDK 后，首次运行清理它留在数据目录里的残留（只执行一次）
+        LegacyCleaner.INSTANCE.cleanOnce(this);
 
         int dbVersion = SPStaticUtils.getInt(DB_VERSION);
         if (!isFirstInstall() && dbVersion < DaoMaster.SCHEMA_VERSION) {

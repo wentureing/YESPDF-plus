@@ -65,6 +65,11 @@
 - 沿用上游风格：MVP + GreenDAO + EventBus + LiveData/RxJava；新增代码不引入 MVC 框架重写。
 - Kotlin 1.3.61 / `kotlin-android-extensions` 合成视图仍是现行写法，不要升级 Kotlin 主版本（会破坏全仓合成视图）。
 - 数据库变更必须同时更新 `greendao.schemaVersion` 与 `UpdateOpenHelper` 的迁移分支。
+- **当前 `schemaVersion = 4`**：刻意与官方分发版 v2.2.5（DB `user_version=4`）对齐，
+  这样官方版备份的数据库写回来时不会被判为"降级"。我们自己的 3 → 4 升级走
+  `UpdateOpenHelper` 的 `MigrationHelper`（重建表、保留数据）。
+- **友盟 SDK 已移除**，`Statistic` 保留为 no-op 占位；老用户数据目录中的
+  `ua.db` / `umeng_*.xml` 由 `LegacyCleaner.cleanOnce()` 在首次启动时清理一次。
 - 中文 commit message，前缀用里程碑号：`build(M0):`、`feat(M2):`、`fix(M1):`、`ci:`、`docs:`。
 
 ## 六、安全

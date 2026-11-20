@@ -10,7 +10,7 @@
 | 形态 | 单模块 Android App + 内嵌 library 模块 `android-pdf-viewer` |
 | 语言 | Java + Kotlin 混编（Kotlin 1.3.61，`kotlin-android-extensions` 合成视图） |
 | 架构 | 自写 MVP（`IViewAllContract` / `PreviewActivity` 直连）+ EventBus + LiveData + RxJava2 + AutoDispose |
-| 持久化 | GreenDAO 3.2.2（`PDF` / `Collection` / `RecentPDF` 三张表，schemaVersion 3），由 `UpdateOpenHelper` + `MigrationHelper` 迁移 |
+| 持久化 | GreenDAO 3.2.2（`PDF` / `Collection` / `RecentPDF` 三张表，**schemaVersion 已提到 4**，与官方分发版 v2.2.5 对齐），由 `UpdateOpenHelper` + `MigrationHelper` 迁移 |
 | 渲染 | 内嵌 `android-pdf-viewer` 3.2.0-beta.1（barteksc 分支），底层 `com.github.barteksc:pdfium-android:1.9.0` |
 | UI | 传统 View 体系：ButterKnife 10.1.0 + ConstraintLayout + Material 1.3.0-alpha01 + 大量 `@drawable/app_*` 资源前缀 |
 | 构建 | AGP 3.4.1 + Gradle 5.4.1 + compileSdk 29 / minSdk 21 / targetSdk 28，签名信息读 `local.properties` |

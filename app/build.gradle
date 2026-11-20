@@ -102,7 +102,10 @@ android {
 }
 
 greendao {
-    schemaVersion 3 // 数据库版本号
+    // 4：与官方分发版 v2.2.5（user_version=4）对齐，
+    // 这样官方版备份的数据库写回来时不会被当成"降级"而崩溃；
+    // 我们自己从 3 升级上来的用户会走 UpdateOpenHelper 的迁移（重建表、保留数据）。
+    schemaVersion 4 // 数据库版本号
     daoPackage 'com.aaron.yespdf.common.greendao' // 设置 DaoMaster、DaoSession、Dao包名
     targetGenDir 'src/main/java' // 设置DaoMaster、DaoSession、Dao目录
     // targetGenDirTest：设置生成单元测试目录
@@ -142,13 +145,11 @@ dependencies {
     implementation 'com.github.CymChad:BaseRecyclerViewAdapterHelper:2.9.46'
 //    implementation 'io.github.yuweiguocn:GreenDaoUpgradeHelper:v2.2.1'
 
-    implementation  'com.umeng.umsdk:common:9.1.0' // (必选)
-    implementation  'com.umeng.umsdk:asms:1.1.3' // asms包依赖(必选)
-    implementation 'com.umeng.umsdk:crash:0.0.4' // native crash包依赖(必选)
-    implementation  'com.umeng.umsdk:oaid_lenovo:1.0.0' // (可选)
-    implementation  'com.umeng.umsdk:oaid_mi:1.0.0' // (可选)
-    implementation  'com.umeng.umsdk:oaid_oppo:1.0.4' // (可选)
-    implementation  'com.umeng.umsdk:oaid_vivo:1.0.0.1' // (可选)
+    // 友盟（UMeng）统计/崩溃 SDK 已移除：
+    // 1) 隐私：与"不采集用户行为"的产品取向不符
+    // 2) 体积：SDK 及其 oaid 插件占用数 MB
+    // 老用户数据目录里会留下 ua.db / umeng_*.xml 等残留，
+    // 可在「应用数据管理 → 清理已移除 SDK 的残留」中检查并删除。
 }
 repositories {
     mavenCentral()

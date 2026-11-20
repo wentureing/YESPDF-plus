@@ -139,7 +139,7 @@ object InternalDataScanner {
         val name = file.name
         // 数据库与设置文件的文件名被代码硬编码，改名会直接打不开
         if (name.startsWith(AppConfig.DB_NAME)) return false
-        if (name == "SPStaticUtils.xml") return false
+        if (file.parentFile?.name == "shared_prefs" && name.endsWith(".xml")) return false
         return true
     }
 
@@ -186,8 +186,17 @@ object InternalDataScanner {
             name.startsWith("${AppConfig.DB_NAME}-") ->
                 return "数据库临时日志（-wal/-shm/-journal）" to "退出应用后可安全删除"
 
-            name == "SPStaticUtils.xml" ->
-                return "应用设置：夜间显示、扫描规则、已保存密码密文等" to "删除后所有设置恢复默认"
+            name.startsWith("umeng", ignoreCase = true) ||
+                    name.startsWith("um_", ignoreCase = true) ||
+                    name.equals("UA.db", ignoreCase = true) ||
+                    name.equals("umeng_zero_cache.db", ignoreCase = true) ->
+                return "友盟 SDK 残留（SDK 已移除，新版本启动时会自动清理一次）" to
+                        "若仍存在，说明删除被占用，可在此手动删除"
+
+            // SharedPreferences：不假设文件名（blankj 默认是 spUtils.xml，但可能随版本变化）
+            file.parentFile?.name == "shared_prefs" && name.endsWith(".xml") ->
+                return "应用设置（SharedPreferences）：夜间显示、扫描规则、已保存密码密文等" to
+                        "删除后相关设置恢复默认"
 
             name.endsWith(".jpg") || name.endsWith(".png") || name.endsWith(".webp") -> {
                 val pdf = covers[file.absolutePath]
