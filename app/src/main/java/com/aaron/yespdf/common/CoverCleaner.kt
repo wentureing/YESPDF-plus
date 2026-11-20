@@ -51,7 +51,8 @@ object CoverCleaner {
                 val path = file.absolutePath
                 if (!path.startsWith(dataPath) && !path.startsWith(filesPath)) continue
 
-                val ext = path.substringAfterLast('.', "").lowercase()
+                // Kotlin 1.3 没有 lowercase()（1.5 才有），这里必须用 toLowerCase()
+                val ext = path.substringAfterLast('.', "").toLowerCase()
                 if (ext !in IMAGE_EXT) continue
 
                 if (file.delete()) {
