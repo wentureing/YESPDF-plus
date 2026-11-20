@@ -1,13 +1,18 @@
 package com.aaron.yespdf.data
 
+import android.app.Activity
 import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -46,6 +51,8 @@ class DataManagerActivity : CommonActivity() {
     private lateinit var adapter: DataFileAdapter
     private var roots: List<DataRoot> = emptyList()
     private var currentDir: File? = null
+    private var pendingExportFiles: List<File> = emptyList()
+    private var pendingReplaceFile: File? = null
 
     override fun layoutId(): Int = R.layout.app_activity_data_manager
 
@@ -80,6 +87,197 @@ class DataManagerActivity : CommonActivity() {
         finish()
         return true
     }
+
+    //region 系统文件选择器（S3）
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.app_menu_data_manager, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.app_menu_import_files -> pickImportFiles()
+            R.id.app_menu_import_dir -> pickImportTree()
+            R.id.app_menu_export_dir -> pickExportTree()
+            R.id.app_menu_refresh -> refresh()
+        }
+        return true
+    }
+
+    /**
+     * 选文件：故意用 `*/*` 且**不设 EXTRA_MIME_TYPES**。
+     * 一旦按类型过滤，系统侧边栏会被裁剪成"可能含该类型"的少数入口，
+     * 图片/视频/音频/下载/手机型号/第三方 App 目录都会消失。
+     */
+    private fun pickImportFiles() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*")
+                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivityForResult(intent, REQ_IMPORT_FILES)
+    }
+
+    /** 选文件夹：只有 OPEN_DOCUMENT_TREE 能选目录，侧边栏也只会列出支持建目录的根 */
+    private fun pickImportTree() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        startActivityForResult(intent, REQ_IMPORT_TREE)
+    }
+
+    private fun pickExportTree() {
+        val files = adapter.selectedFiles()
+        if (files.isEmpty()) {
+            UiManager.showShort(R.string.app_data_select_first)
+            return
+        }
+        pendingExportFiles = files
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        startActivityForResult(intent, REQ_EXPORT_TREE)
+    }
+
+    private fun pickReplaceImage(target: File) {
+        pendingReplaceFile = target
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("image/*")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivityForResult(intent, REQ_REPLACE_IMAGE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != Activity.RESULT_OK || data == null) return
+        when (requestCode) {
+            REQ_IMPORT_FILES -> handleImportFiles(data)
+            REQ_IMPORT_TREE -> data.data?.let { handleImportTree(it) }
+            REQ_EXPORT_TREE -> data.data?.let { handleExportTree(it) }
+            REQ_REPLACE_IMAGE -> data.data?.let { handleReplaceImage(it) }
+        }
+    }
+
+    private fun handleImportFiles(data: Intent) {
+        val target = currentDir ?: filesDir
+        val items = ArrayList<Pair<Uri, String>>()
+        val clip = data.clipData
+        if (clip != null) {
+            for (index in 0 until clip.itemCount) {
+                val uri = clip.getItemAt(index).uri ?: continue
+                items.add(uri to displayName(uri))
+            }
+        } else {
+            data.data?.let { items.add(it to displayName(it)) }
+        }
+        if (items.isEmpty()) return
+
+        Thread {
+            var ok = 0
+            var touchedDb = false
+            for ((uri, name) in items) {
+                if (DocumentTreeHelper.copyDocumentToDir(contentResolver, uri, name, target)) {
+                    ok++
+                    if (name.startsWith(AppConfig.DB_NAME)) touchedDb = true
+                }
+            }
+            val count = ok
+            runOnUiThread {
+                UiManager.showShort(getString(R.string.app_data_imported, count))
+                refresh()
+                if (touchedDb) promptRestartAfterDbImport()
+            }
+        }.start()
+    }
+
+    private fun handleImportTree(treeUri: Uri) {
+        DocumentTreeHelper.takePermissions(contentResolver, treeUri)
+        val target = currentDir ?: filesDir
+        UiManager.showShort(R.string.app_data_importing)
+        Thread {
+            val count = DocumentTreeHelper.copyTreeToDir(contentResolver, treeUri, target)
+            val touchedDb = File(target, AppConfig.DB_NAME).exists()
+            runOnUiThread {
+                UiManager.showShort(getString(R.string.app_data_imported, count))
+                refresh()
+                if (touchedDb) promptRestartAfterDbImport()
+            }
+        }.start()
+    }
+
+    private fun handleExportTree(treeUri: Uri) {
+        DocumentTreeHelper.takePermissions(contentResolver, treeUri)
+        val files = pendingExportFiles
+        pendingExportFiles = emptyList()
+        if (files.isEmpty()) return
+
+        Thread {
+            var ok = 0
+            for (file in files) {
+                val done = if (file.isDirectory) {
+                    DocumentTreeHelper.writeDirToTree(contentResolver, treeUri, file)
+                } else {
+                    DocumentTreeHelper.writeFileToTree(contentResolver, treeUri, file)
+                }
+                if (done) ok++
+            }
+            val count = ok
+            runOnUiThread {
+                adapter.exitSelection()
+                UiManager.showShort(getString(R.string.app_data_exported_count, count))
+            }
+        }.start()
+    }
+
+    private fun handleReplaceImage(uri: Uri) {
+        val target = pendingReplaceFile ?: return
+        pendingReplaceFile = null
+        Thread {
+            val bitmap = DocumentTreeHelper.loadScaledImage(contentResolver, uri)
+            val saved = bitmap != null && DocumentTreeHelper.saveJpeg(bitmap, target)
+            runOnUiThread {
+                if (saved) {
+                    UiManager.showShort(R.string.app_data_image_replaced)
+                    refresh()
+                } else {
+                    UiManager.showShort(R.string.app_data_op_failed)
+                }
+            }
+        }.start()
+    }
+
+    private fun displayName(uri: Uri): String {
+        var name = uri.lastPathSegment ?: "imported"
+        try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) name = cursor.getString(0) ?: name
+            }
+        } catch (e: Throwable) {
+            // 拿不到名字就用 uri 末段
+        }
+        return name
+    }
+
+    /** 导入的目录/文件覆盖了数据库 → 必须重启，热重连会落到已被替换的 inode 上 */
+    private fun promptRestartAfterDbImport() {
+        var dialog: Dialog? = null
+        dialog = DialogManager.createDoubleBtnDialog(this) { tvTitle, tvContent, btnLeft, btnRight ->
+            tvTitle.setText(R.string.app_data_restart_title)
+            tvContent.setText(R.string.app_data_restart_content)
+            btnLeft.setText(R.string.app_data_intro_skip)
+            btnLeft.setOnClickListener { dialog?.dismiss() }
+            btnRight.setText(R.string.app_data_restart_now)
+            btnRight.setOnClickListener {
+                dialog?.dismiss()
+                finishAffinity()
+                android.os.Process.killProcess(android.os.Process.myPid())
+                kotlin.system.exitProcess(0)
+            }
+        }
+        dialog?.show()
+    }
+
+    //endregion
 
     override fun onBackPressed() {
         when {
@@ -224,6 +422,12 @@ class DataManagerActivity : CommonActivity() {
                 export(listOf(item.file))
             }
         }
+        if (isImage(item.title)) {
+            add(getString(R.string.app_data_replace_image)) {
+                dialog.dismiss()
+                pickReplaceImage(item.file)
+            }
+        }
         if (item.isDatabase) {
             add(getString(R.string.app_data_delete_db), true) {
                 dialog.dismiss()
@@ -244,8 +448,13 @@ class DataManagerActivity : CommonActivity() {
         dialog.show()
     }
 
-    private fun buildNote(item: DataItem): String {
-        val size = InternalDataScanner.formatSize(item.size)
+    private fun isImage(name: String): Boolean {
+        val lower = name.toLowerCase()
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                lower.endsWith(".png") || lower.endsWith(".webp")
+    }
+
+    private fun buildNote(item: DataItem): String {        val size = InternalDataScanner.formatSize(item.size)
         val time = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).format(Date(item.file.lastModified()))
         val extra = if (item.subNote.isNotEmpty()) "\n${item.subNote}" else ""
         return "${item.note}\n$size · $time$extra"
@@ -472,6 +681,11 @@ class DataManagerActivity : CommonActivity() {
 
     companion object {
         private const val SP_TIP_SHOWN = "SP_DATA_MANAGER_TIP_SHOWN"
+
+        private const val REQ_IMPORT_FILES = 2001
+        private const val REQ_IMPORT_TREE = 2002
+        private const val REQ_EXPORT_TREE = 2003
+        private const val REQ_REPLACE_IMAGE = 2004
 
         @JvmStatic
         fun start(context: Context) {
