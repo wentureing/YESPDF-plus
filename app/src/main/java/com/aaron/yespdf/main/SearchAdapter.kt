@@ -9,6 +9,7 @@ import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.aaron.base.image.DefaultOption
 import com.aaron.base.image.ImageLoader
+import com.aaron.yespdf.common.CoverPaths
 import com.aaron.yespdf.R
 import com.aaron.yespdf.common.*
 import com.aaron.yespdf.common.bean.PDF
@@ -94,8 +95,9 @@ internal class SearchAdapter(
             val bookName = pdf.name
             viewHolder.tvTitle.text = bookName
             viewHolder.tvProgress.text = context.getString(R.string.app_already_read, pdf.progress)
-            if (!StringUtils.isEmpty(cover)) {
-                ImageLoader.load(context, DefaultOption.Builder(cover).into(viewHolder.ivCover))
+            val resolved = CoverPaths.resolvePath(context, cover)
+            if (!StringUtils.isEmpty(resolved)) {
+                ImageLoader.load(context, DefaultOption.Builder(resolved).into(viewHolder.ivCover))
             } else {
                 viewHolder.ivCover.scaleType = ImageView.ScaleType.FIT_XY
                 viewHolder.ivCover.setImageResource(R.drawable.app_img_none_cover)

@@ -4,6 +4,7 @@ import android.view.View
 import android.widget.ImageView
 import com.aaron.base.image.DefaultOption
 import com.aaron.base.image.ImageLoader
+import com.aaron.yespdf.common.CoverPaths
 import com.aaron.yespdf.R
 import com.aaron.yespdf.common.App
 import com.aaron.yespdf.common.BaseAdapter
@@ -52,7 +53,8 @@ class AllAdapter2(
 
     private fun setCover(ivCover: ImageView, path: String?) {
         if (!StringUtils.isEmpty(path)) {
-            ImageLoader.load(mContext, DefaultOption.Builder(path).into(ivCover))
+            val resolved = CoverPaths.resolvePath(mContext, path)
+            ImageLoader.load(mContext, DefaultOption.Builder(resolved ?: path).into(ivCover))
         } else {
             ivCover.scaleType = ImageView.ScaleType.FIT_XY
             ivCover.setImageResource(R.drawable.app_img_none_cover)

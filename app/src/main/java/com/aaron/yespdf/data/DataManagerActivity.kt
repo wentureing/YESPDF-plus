@@ -103,6 +103,9 @@ class DataManagerActivity : CommonActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.app_menu_clean_covers -> confirmCoverAction(CoverAction.CLEAN)
+            R.id.app_menu_compress_covers -> confirmCoverAction(CoverAction.COMPRESS)
+            R.id.app_menu_reorganize_covers -> confirmCoverAction(CoverAction.REORG)
             R.id.app_menu_auto_restore -> pickAutoRestore()
             R.id.app_menu_import_files -> pickImportFiles()
             R.id.app_menu_import_dir -> pickImportTree()
@@ -125,6 +128,87 @@ class DataManagerActivity : CommonActivity() {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         startActivityForResult(intent, REQ_IMPORT_FILES)
     }
+
+    //region 封面维护（清理 / 压缩 / 整理）
+
+    private enum class CoverAction { CLEAN, COMPRESS, REORG }
+
+    private fun confirmCoverAction(action: CoverAction) {
+        val titleRes: Int
+        val contentRes: Int
+        when (action) {
+            CoverAction.CLEAN -> {
+                titleRes = R.string.app_data_cover_clean
+                contentRes = R.string.app_data_cover_clean_desc
+            }
+            CoverAction.COMPRESS -> {
+                titleRes = R.string.app_data_cover_compress
+                contentRes = R.string.app_data_cover_compress_desc
+            }
+            CoverAction.REORG -> {
+                titleRes = R.string.app_data_cover_reorg
+                contentRes = R.string.app_data_cover_reorg_desc
+            }
+        }
+        var dialog: Dialog? = null
+        dialog = DialogManager.createDoubleBtnDialog(this) { tvTitle, tvContent, btnLeft, btnRight ->
+            tvTitle.setText(titleRes)
+            tvContent.setText(contentRes)
+            btnLeft.setText(R.string.app_cancel)
+            btnLeft.setOnClickListener { dialog?.dismiss() }
+            btnRight.setText(R.string.app_data_cover_action_go)
+            btnRight.setOnClickListener {
+                dialog?.dismiss()
+                runCoverAction(action)
+            }
+        }
+        dialog?.show()
+    }
+
+    private fun runCoverAction(action: CoverAction) {
+        showBlocking(when (action) {
+            CoverAction.CLEAN -> R.string.app_data_cover_cleaning
+            CoverAction.COMPRESS -> R.string.app_data_cover_compressing
+            CoverAction.REORG -> R.string.app_data_cover_organizing
+        })
+        Thread {
+            try {
+                val ctx = applicationContext
+                val summary = when (action) {
+                    CoverAction.CLEAN -> {
+                        val r = CoverOps.deleteOrphans(ctx)
+                        getString(R.string.app_data_cover_clean_done,
+                                r.changed, InternalDataScanner.formatSize(r.beforeBytes))
+                    }
+                    CoverAction.COMPRESS -> {
+                        val r = CoverOps.compress(ctx)
+                        getString(R.string.app_data_cover_compress_done,
+                                r.changed, r.skipped,
+                                InternalDataScanner.formatSize(r.beforeBytes),
+                                InternalDataScanner.formatSize(r.afterBytes))
+                    }
+                    CoverAction.REORG -> {
+                        val r = CoverOps.reorganize(ctx)
+                        getString(R.string.app_data_cover_reorg_done, r.changed, r.skipped)
+                    }
+                }
+                runOnUiThread {
+                    dismissBlocking()
+                    refresh()
+                    loadOverview()
+                    UiManager.showCenterShort(summary)
+                }
+            } catch (t: Throwable) {
+                LogUtils.w("cover action failed: " + t.message)
+                runOnUiThread {
+                    dismissBlocking()
+                    UiManager.showShort(R.string.app_data_op_failed)
+                }
+            }
+        }.start()
+    }
+
+    //endregion
 
     /**
      * 「从备份自动恢复」：只需选一次备份目录，应用按文件类型各自归位，不再依赖"当前在哪个目录"。

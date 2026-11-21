@@ -8,7 +8,6 @@ import com.aaron.yespdf.common.bean.RecentPDF
 import com.aaron.yespdf.common.event.ImportEvent
 import com.aaron.yespdf.common.greendao.*
 import com.aaron.yespdf.common.utils.PdfUtils
-import com.blankj.utilcode.util.PathUtils
 import com.blankj.utilcode.util.StringUtils
 import org.greenrobot.eventbus.EventBus
 import java.util.*
@@ -277,8 +276,11 @@ object DBHelper {
         val dir = pdf?.dir ?: groupName
         val name = pdf?.name ?: getName(filePath)
         val path = pdf?.path ?: filePath
+        // 封面统一写到 files/covers/<书名>.jpg（新约定）；旧路径由 CoverPaths.resolve 兼容
+        val coverFile = CoverPaths.fileFor(App.getContext(), name)
+        coverFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
         val cover = PdfUtils.saveBitmap(PdfUtils.pdfToBitmap(pdf?.path
-                ?: filePath, 0), "${PathUtils.getInternalAppDataPath()}/$name.jpg")
+                ?: filePath, 0), coverFile.absolutePath)
         val progress = pdf?.progress ?: "0.0%"
         val curPage = pdf?.curPage ?: 0
         val bookmarkPage = pdf?.bookmark ?: ""

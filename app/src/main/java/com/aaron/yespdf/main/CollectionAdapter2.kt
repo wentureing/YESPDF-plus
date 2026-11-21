@@ -3,6 +3,7 @@ package com.aaron.yespdf.main
 import android.widget.ImageView
 import com.aaron.base.image.DefaultOption
 import com.aaron.base.image.ImageLoader
+import com.aaron.yespdf.common.CoverPaths
 import com.aaron.yespdf.R
 import com.aaron.yespdf.common.App
 import com.aaron.yespdf.common.BaseAdapter
@@ -30,8 +31,9 @@ class CollectionAdapter2(
         item.run {
             helper.tvTitle.text = name
             helper.tvProgress.text = mContext.getString(R.string.app_already_read, progress)
-            if (!StringUtils.isEmpty(cover)) {
-                ImageLoader.load(mContext, DefaultOption.Builder(cover).into(helper.ivCover))
+            val resolved = CoverPaths.resolvePath(mContext, cover)
+            if (!StringUtils.isEmpty(resolved)) {
+                ImageLoader.load(mContext, DefaultOption.Builder(resolved).into(helper.ivCover))
             } else {
                 helper.ivCover.scaleType = ImageView.ScaleType.FIT_XY
                 helper.ivCover.setImageResource(R.drawable.app_img_none_cover)

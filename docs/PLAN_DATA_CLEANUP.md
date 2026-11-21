@@ -124,3 +124,23 @@
 1. P1 的"整理"是否**默认勾选**自动压缩与清孤儿？（建议默认勾选）
 2. Glide 磁盘缓存是否要**关闭**（关闭后封面加载略慢，但省一份副本）？
 3. P1 整理前是否自动导出 DB 副本（建议开启）？
+
+## 实施记录（P1-P4 已完成）
+
+| 阶段 | 落地内容 | 关键文件 |
+|---|---|---|
+| P1 | 封面路径约定 + 三操作 | `common/CoverPaths.kt`、`data/CoverOps.kt`、`DBHelper`（写 `files/covers/`）、4 个 Adapter 用 `CoverPaths.resolvePath` |
+| P2 | 选中可见性 | `drawable/app_sel_select_single.xml`（补三态）、`app_sel_item_bg.xml`、`app_shape_selected_bg.xml`、`app_recycler_item_filepicker.xml`（箭头与勾选框叠放）、`DataFileAdapter`（`itemView.isSelected`） |
+| P3 | 目录去重 | `InternalData.dataRoot` 加 `filesOnly`；移除 `app data` 根，改「旧封面」专项视图；`loadOverview` 不再重复统计 |
+| P4 | 文案 | `InternalData.roots()` 与 `noteOf()` 的目录说明改为短标签 |
+
+### 架构阈值自查（arch_check）
+
+| 指标 | 当前 | 上限 | 结论 |
+|---|---|---|---|
+| `common` 顶层源文件 | **24** | 25 | ⚠️ 仅剩 1 个余量，**后续新增必须放子目录** |
+| `data` 源文件 | 5 | 25 | OK |
+| `common/DataManagerActivity` 行数 | 991 | 1800 | OK（已把自动恢复/导入/封面维护拆成独立函数与 `CoverOps` 文件） |
+
+依赖方向：`CoverPaths`（L0）只依赖 `Context`/`File`；`CoverOps`（L1）依赖 `common`（L0）；
+4 个 Adapter（L2）依赖 `common`（L0）。无新增反向依赖，`arch_check` 无需新增 WAIVER。
