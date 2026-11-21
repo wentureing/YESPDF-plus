@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<selector>
-    <!--    <item android:drawable="@drawable/app_ic_check_circle_red_24dp" android:state_checked="true"/>-->
-    <!--    <item android:drawable="@drawable/app_ic_imported" android:state_enabled="false"/>-->
-    <!--    <item android:drawable="@drawable/app_ic_unchecked_grey_24dp"/>-->
+<!--
+  勾选框三态。
+
+  历史问题：这个文件里的 item 全被注释掉了，等于一个空 selector，
+  所以任何直接引用它的列表（应用数据管理）在长按多选时**完全看不到选中状态**。
+  导入页（ViewAllAdapter）之所以能看到，是因为它在代码里对这个 StateListDrawable
+  动态 addState 补齐了三态。
+
+  这里把三态显式写进 XML，两边都不再依赖代码补丁：
+  - 已勾选：红色对勾
+  - 不可用：已导入图标（代码里仍会按语言覆盖成 en 版本）
+  - 默认：灰色空圈
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/app_ic_check_circle_red_24dp" android:state_checked="true" />
+    <item android:drawable="@drawable/app_ic_imported" android:state_enabled="false" />
+    <item android:drawable="@drawable/app_ic_unchecked_grey_24dp" />
 </selector>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  列表项选中态背景：选中时整行浅红，未选中透明。
+  配合 adapter 里的 itemView.isSelected 使用（与导入页同一套交互）。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:drawable="@drawable/app_shape_selected_bg" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="16dp"
-    android:background="?selectableItemBackground">
+    android:background="@drawable/app_sel_item_bg">
 
     <ImageView
         android:id="@+id/app_iv_icon"
@@ -47,24 +47,33 @@
 
     </LinearLayout>
 
-    <ImageView
-        android:id="@+id/app_iv_next"
+    <!--
+      箭头与勾选框叠在同一位置：进入选择模式时箭头隐藏、复选框出现，
+      右侧视觉位置不变（避免元素跳动导致"看不出选中了什么"）。
+    -->
+    <FrameLayout
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_marginStart="16dp"
-        android:layout_gravity="center"
-        android:src="@drawable/app_ic_navigate_next_black_20dp"
-        tools:ignore="ContentDescription" />
+        android:layout_gravity="center">
 
-    <CheckBox
-        android:id="@+id/app_cb"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_gravity="center"
-        android:button="@drawable/app_sel_select_single"
-        android:visibility="gone"
-        android:background="@null"
-        android:clickable="false"/>
+        <ImageView
+            android:id="@+id/app_iv_next"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/app_ic_navigate_next_black_20dp"
+            tools:ignore="ContentDescription" />
+
+        <CheckBox
+            android:id="@+id/app_cb"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:button="@drawable/app_sel_select_single"
+            android:visibility="gone"
+            android:background="@null"
+            android:clickable="false" />
+
+    </FrameLayout>
 
 </LinearLayout>

@@ -113,6 +113,8 @@ internal class DataFileAdapter(
         // 选择模式下目录也可勾选（目录同样支持删除/复制/导出/重命名）
         view.app_cb.visibility = if (selectionMode) View.VISIBLE else View.GONE
         view.app_cb.isChecked = selected.contains(item.file.absolutePath)
+        // 整行高亮：与导入页一致，选中时 itemView 处于 selected 态
+        view.isSelected = view.app_cb.isChecked
 
         view.setOnClickListener {
             if (selectionMode) {

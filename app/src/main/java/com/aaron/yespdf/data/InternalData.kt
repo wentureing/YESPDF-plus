@@ -6,7 +6,6 @@ import com.aaron.yespdf.R
 import com.aaron.yespdf.common.AppConfig
 import com.aaron.yespdf.common.DataManager
 import com.aaron.yespdf.common.bean.PDF
-import com.blankj.utilcode.util.PathUtils
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,8 +29,8 @@ data class DataItem(
     val canDelete: Boolean get() = true
 }
 
-/** 一个可进入的根目录 */
-data class DataRoot(val label: String, val dir: File, val note: String)
+/** 一个可进入的根目录；[filesOnly] 为 true 时只展示直属文件（不递归子目录） */
+data class DataRoot(val label: String, val dir: File, val note: String, val filesOnly: Boolean = false)
 
 /**
  * 应用内剪贴板（复制 / 剪切）。
@@ -74,32 +73,27 @@ object InternalDataScanner {
     fun roots(context: Context): List<DataRoot> {
         val result = ArrayList<DataRoot>()
         val files = context.filesDir
-        result.add(DataRoot("files", files, "应用文件目录：封面缩略图等派生数据"))
+
+        // 四个精确 root 互不包含，避免列表重复与概览重复统计
+        result.add(DataRoot("files", files, "封面图片"))
 
         context.getDatabasePath(AppConfig.DB_NAME).parentFile?.let {
-            result.add(DataRoot("databases", it, "书库数据库：书名·路径·进度·书签·分组"))
+            result.add(DataRoot("databases", it, "书库数据库"))
         }
 
         val prefs = File(files.parentFile, "shared_prefs")
         if (prefs.exists()) {
-            result.add(DataRoot("shared_prefs", prefs, "应用设置、扫描规则与已保存密码（密文）"))
+            result.add(DataRoot("shared_prefs", prefs, "应用设置"))
         }
 
-        result.add(DataRoot("cache", context.cacheDir, "缓存目录，可随时清空，不影响书库"))
+        result.add(DataRoot("cache", context.cacheDir, "Glide 图片缓存，可清空"))
 
-        // 兼容根：blankj 的 getInternalAppDataPath() 在不同版本可能指向 files 或 data 根
-        val dataPath = try {
-            PathUtils.getInternalAppDataPath()
-        } catch (e: Throwable) {
-            null
-        }
-        if (!dataPath.isNullOrEmpty()) {
-            val dataDir = File(dataPath)
-            val sameAsFiles = dataDir.absolutePath == files.absolutePath
-            val hasChild = dataDir.exists() && (dataDir.list()?.isNotEmpty() == true)
-            if (!sameAsFiles && hasChild) {
-                result.add(DataRoot("app data", dataDir, "应用私有根目录（兼容旧版写入位置）"))
-            }
+        // 旧封面：历史上封面写在 dataDir 根（PDF.COVER 存的是绝对路径）。
+        // 这里只列 dataDir 的**直属文件**，不递归子目录 —— 否则会和上面的
+        // files/cache/databases/shared_prefs 重复出现（曾经的 app data 根问题）。
+        val dataDir = files.parentFile
+        if (dataDir != null && dataDir.exists()) {
+            result.add(DataRoot("旧封面", dataDir, "旧封面（建议一键整理）", filesOnly = true))
         }
         return result
     }
@@ -108,12 +102,13 @@ object InternalDataScanner {
 
     //region 列表与注释
 
-    fun list(dir: File): List<DataItem> {
+    fun list(dir: File, filesOnly: Boolean = false): List<DataItem> {
         val children = dir.listFiles() ?: return emptyList()
         val covers = coverIndex()
         val items = ArrayList<DataItem>()
         for (f in children) {
             if (f.name.startsWith(".")) continue
+            if (filesOnly && f.isDirectory) continue
             val isDir = f.isDirectory
             val size = if (isDir) sizeOf(f) else f.length()
             val notePair = noteOf(f, covers)
@@ -172,11 +167,12 @@ object InternalDataScanner {
         val name = file.name
 
         if (file.isDirectory) {
+            // 列表里只放短标签；完整说明在"查看信息"里给出
             return when (name) {
-                "databases" -> "书库数据库所在目录" to ""
-                "shared_prefs" -> "应用设置与规则" to ""
-                "files" -> "应用文件目录" to ""
-                "cache" -> "缓存目录，可随时清空" to ""
+                "databases" -> "书库数据库" to ""
+                "shared_prefs" -> "应用设置" to ""
+                "files" -> "封面图片" to ""
+                "cache" -> "Glide 图片缓存，可清空" to ""
                 else -> "子目录" to ""
             }
         }

@@ -451,8 +451,10 @@ class DataManagerActivity : CommonActivity() {
     private fun enter(dir: File) {
         currentDir = dir
         adapter.exitSelection()
+        // "旧封面"这类 root 只列直属文件，避免与 files/cache 等重复
+        val filesOnly = roots.firstOrNull { it.dir.absolutePath == dir.absolutePath }?.filesOnly ?: false
         Thread {
-            val items = InternalDataScanner.list(dir)
+            val items = InternalDataScanner.list(dir, filesOnly)
             runOnUiThread {
                 adapter.submit(items)
                 app_tv_path.text = dir.absolutePath
@@ -484,8 +486,16 @@ class DataManagerActivity : CommonActivity() {
             var total = 0L
             var files = 0
             for (root in roots) {
-                // 兼容根可能与 files 重复，跳过避免重复计算
-                if (root.label == "app data") continue
+                if (root.filesOnly) {
+                    // 旧封面：只统计 dataDir 的直属文件，不递归（否则重复计算子目录）
+                    root.dir.listFiles()?.forEach { f ->
+                        if (f.isFile) {
+                            total += f.length()
+                            files++
+                        }
+                    }
+                    continue
+                }
                 total += InternalDataScanner.sizeOf(root.dir)
                 files += InternalDataScanner.countFiles(root.dir)
             }
