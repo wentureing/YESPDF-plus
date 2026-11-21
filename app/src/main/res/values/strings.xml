@@ -157,6 +157,7 @@ You can safely pick the backup root folder (containing db/, sp/, covers/).</stri
     <string name="app_data_refresh">Refresh</string>
     <string name="app_data_select_first">Long-press items to select first</string>
     <string name="app_data_importing">Importing…</string>
+    <string name="app_data_importing_wait">Importing data, please wait… (may take tens of seconds for large files)</string>
     <string name="app_data_imported">%1$d item(s) imported</string>
     <string name="app_data_import_nested">The database landed in subfolder %1$s/. It must sit in databases/: long-press it → Copy → open databases → Paste</string>
     <string name="app_data_imported_not_found">%1$d item(s) imported, but yespdf.db was not found</string>

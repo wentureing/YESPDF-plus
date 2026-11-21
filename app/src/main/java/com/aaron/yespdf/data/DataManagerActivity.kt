@@ -27,7 +27,9 @@ import com.aaron.yespdf.common.DataManager
 import com.aaron.yespdf.common.DialogManager
 import com.aaron.yespdf.common.UiManager
 import com.aaron.yespdf.common.security.PasswordVault
+import com.aaron.yespdf.common.utils.AppRestarter
 import com.aaron.yespdf.common.utils.DialogUtils
+import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.SPStaticUtils
 import com.github.anzewei.parallaxbacklayout.ParallaxBack
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -53,6 +55,8 @@ class DataManagerActivity : CommonActivity() {
     private var roots: List<DataRoot> = emptyList()
     private var currentDir: File? = null
     private var pendingExportFiles: List<File> = emptyList()
+    /** 阻塞式进度弹窗：导入/恢复大文件时一直显示，直到流程结束（如"立即重启"提示出现） */
+    private var blockingDialog: Dialog? = null
     private var pendingReplaceFile: File? = null
 
     override fun layoutId(): Int = R.layout.app_activity_data_manager
@@ -165,7 +169,7 @@ class DataManagerActivity : CommonActivity() {
         val dataDir = filesDir.parentFile
         val dbDir = File(dataDir, "databases")
         val spDir = File(dataDir, "shared_prefs")
-        UiManager.showShort(R.string.app_data_auto_restore_running)
+        showBlocking(R.string.app_data_auto_restore_running)
         Thread {
             val docs = DocumentTreeHelper.collectFiles(contentResolver, treeUri)
             var db = 0
@@ -211,6 +215,7 @@ class DataManagerActivity : CommonActivity() {
             }
             val countDb = db; val countSp = sp; val countImg = img
             runOnUiThread {
+                dismissBlocking()
                 refresh()
                 if (countDb == 0 && countSp == 0 && countImg == 0) {
                     UiManager.showCenterShort(R.string.app_data_auto_restore_none)
@@ -278,6 +283,7 @@ class DataManagerActivity : CommonActivity() {
         }
         if (items.isEmpty()) return
 
+        showBlocking(R.string.app_data_importing_wait)
         Thread {
             var ok = 0
             var touchedDb = false
@@ -289,6 +295,7 @@ class DataManagerActivity : CommonActivity() {
             }
             val count = ok
             runOnUiThread {
+                dismissBlocking()
                 UiManager.showShort(getString(R.string.app_data_imported, count))
                 refresh()
                 if (touchedDb) promptRestartAfterDbImport()
@@ -299,7 +306,7 @@ class DataManagerActivity : CommonActivity() {
     private fun handleImportTree(treeUri: Uri) {
         DocumentTreeHelper.takePermissions(contentResolver, treeUri)
         val target = currentDir ?: filesDir
-        UiManager.showShort(R.string.app_data_importing)
+        showBlocking(R.string.app_data_importing_wait)
         Thread {
             val count = DocumentTreeHelper.copyTreeToDir(contentResolver, treeUri, target)
             // 用户很容易选错层级（把包含 db/ sp/ 的备份根目录整棵导入），
@@ -309,6 +316,7 @@ class DataManagerActivity : CommonActivity() {
                 dir.isDirectory && File(dir, AppConfig.DB_NAME).exists()
             }
             runOnUiThread {
+                dismissBlocking()
                 refresh()
                 when {
                     direct -> {
@@ -388,9 +396,8 @@ class DataManagerActivity : CommonActivity() {
             btnRight.setText(R.string.app_data_restart_now)
             btnRight.setOnClickListener {
                 dialog?.dismiss()
-                finishAffinity()
-                android.os.Process.killProcess(android.os.Process.myPid())
-                kotlin.system.exitProcess(0)
+                // 真重启：AlarmManager 在进程退出后拉起 launcher，而不是只杀进程
+                AppRestarter.restart(this)
             }
         }
         dialog?.show()
@@ -486,6 +493,37 @@ class DataManagerActivity : CommonActivity() {
                     InternalDataScanner.formatSize(total), files, PasswordVault.count())
             runOnUiThread { app_tv_overview.text = text }
         }.start()
+    }
+
+    /**
+     * 显示阻塞进度窗。数据量大时（如 156MB 封面）复制要几十秒，
+     * 只给一个 toast 会让人以为没反应，所以这里全程阻塞并禁止返回键取消。
+     */
+    private fun showBlocking(messageRes: Int) {
+        dismissBlocking()
+        try {
+            val dialog = DialogManager.createLoadingDialog(this)
+            dialog.setCancelable(false)
+            dialog.setCanceledOnTouchOutside(false)
+            (dialog.findViewById<View>(R.id.app_tv_dialog_content) as? TextView)?.setText(messageRes)
+            dialog.show()
+            blockingDialog = dialog
+        } catch (t: Throwable) {
+            LogUtils.w("showBlocking: " + t.message)
+        }
+    }
+
+    private fun dismissBlocking() {
+        try {
+            blockingDialog?.dismiss()
+        } catch (t: Throwable) {
+        }
+        blockingDialog = null
+    }
+
+    override fun onDestroy() {
+        dismissBlocking()
+        super.onDestroy()
     }
 
     private fun updateSelectionBar(inSelection: Boolean, count: Int) {
@@ -718,10 +756,11 @@ class DataManagerActivity : CommonActivity() {
     }
 
     private fun export(files: List<File>) {
-        UiManager.showShort(R.string.app_data_exporting)
+        showBlocking(R.string.app_data_exporting)
         Thread {
             val dir = InternalDataScanner.export(files)
             runOnUiThread {
+                dismissBlocking()
                 if (dir == null) {
                     UiManager.showShort(R.string.app_data_op_failed)
                 } else {
@@ -733,10 +772,12 @@ class DataManagerActivity : CommonActivity() {
 
     private fun pasteIntoCurrentDir() {
         val target = currentDir ?: return
+        showBlocking(R.string.app_data_importing_wait)
         Thread {
             val count = InternalDataScanner.paste(target)
             val touchedDb = File(target, AppConfig.DB_NAME).exists()
             runOnUiThread {
+                dismissBlocking()
                 UiManager.showShort(getString(R.string.app_data_pasted, count))
                 refresh()
                 if (touchedDb) promptRestartAfterDbImport()
@@ -811,11 +852,10 @@ class DataManagerActivity : CommonActivity() {
         try {
             deleteDatabase(AppConfig.DB_NAME)
         } catch (e: Throwable) {
-            // 即使删除失败也要退出，避免状态不一致
+            // 即使删除失败也要重启，避免状态不一致
         }
-        finishAffinity()
-        android.os.Process.killProcess(android.os.Process.myPid())
-        kotlin.system.exitProcess(0)
+        // 删除后直接重启到"空书库"，用户不需要再去桌面点一次图标
+        AppRestarter.restart(this)
     }
 
     //endregion

@@ -155,6 +155,7 @@
     <string name="app_data_refresh">刷新</string>
     <string name="app_data_select_first">请先长按选择要导出的条目</string>
     <string name="app_data_importing">正在导入…</string>
+    <string name="app_data_importing_wait">正在导入数据，请稍候…（文件较大时会持续几十秒）</string>
     <string name="app_data_imported">已导入 %1$d 项</string>
     <string name="app_data_import_nested">数据库被放进了子目录 %1$s/，需要放到 databases 根目录：长按该文件 → 复制 → 进入 databases → 粘贴</string>
     <string name="app_data_imported_not_found">已导入 %1$d 项，但未发现 yespdf.db</string>
